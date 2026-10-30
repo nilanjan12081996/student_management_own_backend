@@ -4,6 +4,7 @@
     "app": {
       "root": ".",
       "framework": "express",
+      "entrypoint": "index.js",
       "bindings": [
         {
           "type": "service",
@@ -15,7 +16,8 @@
     },
     "python": {
       "root": "python",
-      "framework": "fastapi"
+      "framework": "fastapi",
+      "entrypoint": "main.py"
     }
   },
   "rewrites": [
