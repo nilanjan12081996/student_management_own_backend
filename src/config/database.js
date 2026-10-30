@@ -1,4 +1,5 @@
 require('dotenv').config();
+const mysql2 = require('mysql2');
 
 const baseDialectOptions = process.env.DB_SSL === 'true' ? {
   ssl: {
@@ -15,6 +16,7 @@ module.exports = {
     host: process.env.DB_HOST || '127.0.0.1',
     port: process.env.DB_PORT || 3306,
     dialect: 'mysql',
+    dialectModule: mysql2,
     dialectOptions: baseDialectOptions,
   },
   test: {
@@ -24,6 +26,8 @@ module.exports = {
     host: process.env.DB_HOST || '127.0.0.1',
     port: process.env.DB_PORT || 3306,
     dialect: 'mysql',
+    dialectModule: mysql2,
+    dialectOptions: baseDialectOptions,
   },
   production: {
     use_env_variable: process.env.DATABASE_URL ? 'DATABASE_URL' : undefined,
@@ -33,6 +37,7 @@ module.exports = {
     host: process.env.DB_HOST || '127.0.0.1',
     port: process.env.DB_PORT || 3306,
     dialect: 'mysql',
+    dialectModule: mysql2,
     dialectOptions: baseDialectOptions,
   },
 };

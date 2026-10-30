@@ -1,10 +1,12 @@
 'use strict';
 
 const Sequelize = require('sequelize');
+const mysql2 = require('mysql2');
 const process = require('process');
 const env = process.env.NODE_ENV || 'development';
 const dbConfigs = require('../config/database');
 const config = dbConfigs[env] || dbConfigs.production || dbConfigs.development;
+config.dialectModule = mysql2;
 const db = {};
 
 let sequelize;
