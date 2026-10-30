@@ -55,9 +55,8 @@ function forwardToPython(endpoint, method, payload) {
 }
 
 // Fallback direct execution via Python CLI if FastAPI service is not running
-function runPythonScript(scriptName, argsJson) {
+function runPythonScript(scriptName, argsJson, action = 'default') {
   return new Promise((resolve, reject) => {
-    const pythonScript = path.join(PYTHON_DIR, scriptName);
     const pythonCmd = 'python';
 
     const child = execFile(pythonCmd, ['-c', `
@@ -66,16 +65,42 @@ sys.path.insert(0, r"${PYTHON_DIR.replace(/\\/g, '\\\\')}")
 from ${scriptName.replace('.py', '')} import *
 
 payload = json.loads(sys.argv[1]) if len(sys.argv) > 1 else {}
+action = sys.argv[2] if len(sys.argv) > 2 else "default"
+
 if "${scriptName}" == "ai_mcq_generator.py":
-    res = generate_mcqs(payload.get('topic', 'General'), payload.get('difficulty', 'Intermediate'), int(payload.get('count', 5)), payload.get('batch_name', ''))
+    res = generate_mcqs(
+        payload.get('topic', 'General'),
+        payload.get('difficulty', 'Intermediate'),
+        int(payload.get('count', 5)),
+        payload.get('batch_name', ''),
+        payload.get('cognitive_layer', 'Multi-Layer Balanced')
+    )
     print(json.dumps({'success': True, 'questions': res}))
 elif "${scriptName}" == "ai_notes_generator.py":
-    res = generate_notes(payload.get('topic', 'General'), payload.get('subject', 'CS'), payload.get('style', 'Detailed Guide'), payload.get('batch_name', ''))
+    res = generate_notes(
+        payload.get('topic', 'General'),
+        payload.get('subject', 'CS'),
+        payload.get('style', 'Detailed Guide'),
+        payload.get('batch_name', '')
+    )
     print(json.dumps({'success': True, 'note': res}))
 elif "${scriptName}" == "ai_student_mentor.py":
-    res = analyze_quiz_performance(payload.get('student_name', 'Student'), payload.get('quiz_title', 'Quiz'), int(payload.get('score', 0)), int(payload.get('total_marks', 10)), payload.get('wrong_questions', []))
-    print(json.dumps({'success': True, 'analysis': res}))
-`, JSON.stringify(argsJson || {})], { timeout: 15000 }, (error, stdout, stderr) => {
+    if action == "progress":
+        res = analyze_student_progress(
+            payload.get('student_name', 'Student'),
+            payload.get('submissions', [])
+        )
+        print(json.dumps({'success': True, 'progress': res}))
+    else:
+        res = analyze_quiz_performance(
+            payload.get('student_name', 'Student'),
+            payload.get('quiz_title', 'Quiz'),
+            int(payload.get('score', 0)),
+            int(payload.get('total_marks', 10)),
+            payload.get('wrong_questions', [])
+        )
+        print(json.dumps({'success': True, 'analysis': res}))
+`, JSON.stringify(argsJson || {}), action], { timeout: 15000 }, (error, stdout, stderr) => {
       if (error) {
         return reject(error);
       }
@@ -89,8 +114,28 @@ elif "${scriptName}" == "ai_student_mentor.py":
   });
 }
 
+
+// Middleware: Restrict AI Studio generation & status endpoints from student accounts
+const restrictStudentAiAccess = (req, res, next) => {
+  const role = (
+    req.headers['x-user-role'] ||
+    req.headers['role'] ||
+    req.body?.role ||
+    req.query?.role ||
+    ''
+  ).toLowerCase();
+
+  if (role === 'student') {
+    return res.status(403).json({
+      error: 'Access denied: AI Studio features are restricted to tutors and administrators.',
+      forbidden: true
+    });
+  }
+  next();
+};
+
 // GET /api/ai/health
-router.get('/health', async (req, res) => {
+router.get('/health', restrictStudentAiAccess, async (req, res) => {
   try {
     const pyRes = await forwardToPython('/health', 'GET');
     return res.status(pyRes.status).json(pyRes.data);
@@ -98,20 +143,24 @@ router.get('/health', async (req, res) => {
     return res.status(200).json({
       status: 'DEGRADED',
       message: 'FastAPI microservice offline; running direct Python subprocess execution.',
-      python_directory: PYTHON_DIR
+      python_directory: PYTHON_DIR,
+      layers: [
+        'Layer 1: Concept Foundation & Syntax',
+        'Layer 2: Execution Dynamics & Flow',
+        'Layer 3: Diagnostic Debugging & Tracing',
+        'Layer 4: Edge Cases & Trap Detection'
+      ]
     });
   }
 });
 
 // POST /api/ai/generate-mcqs
-router.post('/generate-mcqs', async (req, res) => {
+router.post('/generate-mcqs', restrictStudentAiAccess, async (req, res) => {
   try {
-    // 1. Try FastAPI microservice
     try {
       const pyRes = await forwardToPython('/ai/generate-mcqs', 'POST', req.body);
       return res.status(pyRes.status).json(pyRes.data);
     } catch {
-      // 2. Direct Python script fallback
       const output = await runPythonScript('ai_mcq_generator.py', req.body);
       return res.json(output);
     }
@@ -122,7 +171,7 @@ router.post('/generate-mcqs', async (req, res) => {
 });
 
 // POST /api/ai/generate-notes
-router.post('/generate-notes', async (req, res) => {
+router.post('/generate-notes', restrictStudentAiAccess, async (req, res) => {
   try {
     try {
       const pyRes = await forwardToPython('/ai/generate-notes', 'POST', req.body);
@@ -150,6 +199,22 @@ router.post('/analyze-quiz', async (req, res) => {
   } catch (err) {
     console.error('AI Quiz analysis error:', err);
     return res.status(500).json({ error: 'Failed to analyze quiz attempt', details: err.message });
+  }
+});
+
+// POST /api/ai/student-progress-analysis
+router.post('/student-progress-analysis', async (req, res) => {
+  try {
+    try {
+      const pyRes = await forwardToPython('/ai/student-progress-analysis', 'POST', req.body);
+      return res.status(pyRes.status).json(pyRes.data);
+    } catch {
+      const output = await runPythonScript('ai_student_mentor.py', req.body, 'progress');
+      return res.json(output);
+    }
+  } catch (err) {
+    console.error('AI Progress analysis error:', err);
+    return res.status(500).json({ error: 'Failed to analyze student progress', details: err.message });
   }
 });
 

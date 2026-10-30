@@ -9,6 +9,14 @@ router.post('/createQuiz', quizController.createQuiz);
 router.post('/create', quizController.createQuiz);
 router.post('/', quizController.createQuiz);
 
+// SUBMIT QUIZ & AI EVALUATION (Must be placed before /:id generic param route)
+router.post('/submit', quizController.submitQuiz);
+router.post('/:id/submit', quizController.submitQuiz);
+
+// STUDENT PROGRESS & TOPIC FOCUS GUIDANCE
+router.get('/student-progress/:userId', quizController.getStudentProgress);
+router.get('/progress/:userId', quizController.getStudentProgress);
+
 // GET ALL QUIZZES (supports query filters ?field=, ?title=, ?month=, ?search=, ?includeQuestions=true)
 router.get('/getAllQuizzes', quizController.getAllQuizzes);
 router.get('/getAll', quizController.getAllQuizzes);
@@ -21,6 +29,9 @@ router.get('/getByField/:field', quizController.getQuizzesByField);
 // SUB-ROUTES: QUESTIONS FOR A SPECIFIC QUIZ
 router.post('/:quizId/questions', questionController.createQuestion);
 router.get('/:quizId/questions', questionController.getQuestionsByQuizId);
+
+// SUBMISSIONS FOR A SPECIFIC QUIZ
+router.get('/:id/submissions', quizController.getQuizSubmissions);
 
 // GET QUIZ BY ID
 router.get('/getQuizById/:id', quizController.getQuizById);

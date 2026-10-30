@@ -15,6 +15,11 @@ module.exports = (sequelize, DataTypes) => {
         as: 'questions',
         onDelete: 'CASCADE',
       });
+      Quiz.hasMany(models.Submission, {
+        foreignKey: 'quiz_id',
+        as: 'submissions',
+        onDelete: 'CASCADE',
+      });
       Quiz.belongsTo(models.Organization, { foreignKey: 'organization_id' });
     }
   }
