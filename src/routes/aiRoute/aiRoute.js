@@ -8,50 +8,24 @@ const PYTHON_PORT = process.env.PYTHON_PORT || 5001;
 const PYTHON_DIR = path.resolve(__dirname, '../../../python');
 
 // Helper to make an HTTP request to the running Python FastAPI microservice
-function forwardToPython(endpoint, method, payload) {
-  return new Promise((resolve, reject) => {
-    const postData = payload ? JSON.stringify(payload) : '';
-    const options = {
-      hostname: process.env.PYTHON_HOST || '127.0.0.1',
-      port: PYTHON_PORT,
-      path: endpoint,
-      method: method,
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(postData)
-      },
-      timeout: 10000 // 10s timeout
-    };
+async function forwardToPython(endpoint, method, payload) {
+  const baseUrl = process.env.PYTHON_URL || ('http://' + (process.env.PYTHON_HOST || '127.0.0.1') + ':' + (process.env.PYTHON_PORT || 5001));
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
+  const cleanBase = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
+  const targetUrl = new URL(cleanEndpoint, cleanBase);
 
-    const req = http.request(options, (res) => {
-      let data = '';
-      res.on('data', (chunk) => {
-        data += chunk;
-      });
-      res.on('end', () => {
-        try {
-          const parsed = JSON.parse(data);
-          resolve({ status: res.statusCode, data: parsed });
-        } catch (e) {
-          resolve({ status: res.statusCode, data });
-        }
-      });
-    });
-
-    req.on('error', (err) => {
-      reject(err);
-    });
-
-    req.on('timeout', () => {
-      req.destroy();
-      reject(new Error('Python AI service timed out'));
-    });
-
-    if (postData) {
-      req.write(postData);
-    }
-    req.end();
+  const response = await fetch(targetUrl.toString(), {
+    method: method,
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: payload && method !== 'GET' ? JSON.stringify(payload) : undefined,
+    signal: AbortSignal.timeout(15000)
   });
+
+  const contentType = response.headers.get('content-type') || '';
+  const data = contentType.includes('application/json') ? await response.json() : await response.text();
+  return { status: response.status, data };
 }
 
 // Fallback direct execution via Python CLI if FastAPI service is not running
