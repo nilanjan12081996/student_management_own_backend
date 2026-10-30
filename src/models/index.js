@@ -8,8 +8,39 @@ const config = dbConfigs[env] || dbConfigs.production || dbConfigs.development;
 const db = {};
 
 let sequelize;
-if (config.use_env_variable) {
-  sequelize = new Sequelize(process.env[config.use_env_variable], config);
+if (config.use_env_variable && process.env[config.use_env_variable]) {
+  let dbUrl = process.env[config.use_env_variable];
+  try {
+    const parsed = new URL(dbUrl);
+    const sslParam = parsed.searchParams.get('ssl');
+    parsed.searchParams.delete('ssl');
+    dbUrl = parsed.toString();
+
+    let sslConfig = {
+      minVersion: 'TLSv1.2',
+      rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true'
+    };
+
+    if (sslParam) {
+      try {
+        const parsedSsl = JSON.parse(sslParam);
+        if (typeof parsedSsl === 'object' && parsedSsl !== null) {
+          sslConfig = { ...sslConfig, ...parsedSsl };
+        }
+      } catch (e) {
+        // Ignored if not JSON
+      }
+    }
+
+    config.dialectOptions = {
+      ...(config.dialectOptions || {}),
+      ssl: sslConfig
+    };
+  } catch (err) {
+    console.error('Database URL parsing warning:', err.message);
+  }
+
+  sequelize = new Sequelize(dbUrl, config);
 } else {
   sequelize = new Sequelize(config.database, config.username, config.password, config);
 }

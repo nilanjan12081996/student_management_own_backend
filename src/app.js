@@ -38,8 +38,9 @@ app.get('/', (req, res) => {
   });
 });
 
-// Main routes
+// Main routes (mount under both /api and / to handle serverless rewrites safely)
 app.use('/api', routes);
+app.use('/', routes);
 
 // Handle unknown routes
 app.use((req, res, next) => {
