@@ -1,25 +1,11 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "services": {
-    "app": {
-      "root": ".",
-      "framework": "express",
-      "entrypoint": "index.js",
-      "bindings": [
-        {
-          "type": "service",
-          "service": "python",
-          "format": "url",
-          "env": "PYTHON_URL"
-        }
-      ]
-    },
-    "python": {
-      "root": "python",
-      "framework": "fastapi",
-      "entrypoint": "main:app"
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.js"
     }
-  },
+  ],
   "headers": [
     {
       "source": "/(.*)",
@@ -37,14 +23,6 @@
           "value": "Origin, X-Requested-With, Content-Type, Accept, Authorization, x-user-role, role, *"
         }
       ]
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": {
-        "service": "app"
-      }
     }
   ]
 }
