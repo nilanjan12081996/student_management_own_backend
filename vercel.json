@@ -1,9 +1,29 @@
 {
-  "version": 2,
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "app": {
+      "root": ".",
+      "framework": "express",
+      "bindings": [
+        {
+          "type": "service",
+          "service": "python",
+          "format": "url",
+          "env": "PYTHON_URL"
+        }
+      ]
+    },
+    "python": {
+      "root": "python",
+      "framework": "fastapi"
+    }
+  },
   "rewrites": [
     {
       "source": "/(.*)",
-      "destination": "/api"
+      "destination": {
+        "service": "app"
+      }
     }
   ],
   "headers": [

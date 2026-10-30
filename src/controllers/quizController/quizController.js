@@ -18,37 +18,22 @@ const formatOptions = (options) => {
 // AI Microservice Helper for Quiz Performance Analysis
 async function callAiAnalyze(payload) {
   try {
-    const postData = JSON.stringify(payload);
-    const options = {
-      hostname: '127.0.0.1',
-      port: process.env.PYTHON_PORT || 5001,
-      path: '/ai/analyze-quiz',
+    const baseUrl = process.env.PYTHON_URL || ('http://' + (process.env.PYTHON_HOST || '127.0.0.1') + ':' + (process.env.PYTHON_PORT || 5001));
+    const cleanBase = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
+    const targetUrl = new URL('ai/analyze-quiz', cleanBase);
+
+    const response = await fetch(targetUrl.toString(), {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(postData)
+        'Content-Type': 'application/json'
       },
-      timeout: 6000
-    };
-
-    return await new Promise((resolve) => {
-      const req = http.request(options, (res) => {
-        let data = '';
-        res.on('data', chunk => { data += chunk; });
-        res.on('end', () => {
-          try {
-            const parsed = JSON.parse(data);
-            resolve(parsed.analysis || parsed);
-          } catch {
-            resolve(null);
-          }
-        });
-      });
-      req.on('error', () => resolve(null));
-      req.on('timeout', () => { req.destroy(); resolve(null); });
-      req.write(postData);
-      req.end();
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(6000)
     });
+
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.analysis || data;
   } catch {
     return null;
   }
