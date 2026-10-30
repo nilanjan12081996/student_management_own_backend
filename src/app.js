@@ -18,6 +18,15 @@ app.use((req, res, next) => {
   next();
 });
 
+// Root health check endpoint
+app.get('/', (req, res) => {
+  res.status(200).json({
+    status: 'UP',
+    message: 'Student Management API is running',
+    health: '/api/health'
+  });
+});
+
 // Main routes
 app.use('/api', routes);
 

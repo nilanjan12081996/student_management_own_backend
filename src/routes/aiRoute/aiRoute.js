@@ -12,7 +12,7 @@ function forwardToPython(endpoint, method, payload) {
   return new Promise((resolve, reject) => {
     const postData = payload ? JSON.stringify(payload) : '';
     const options = {
-      hostname: '127.0.0.1',
+      hostname: process.env.PYTHON_HOST || '127.0.0.1',
       port: PYTHON_PORT,
       path: endpoint,
       method: method,

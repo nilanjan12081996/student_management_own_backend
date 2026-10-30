@@ -8,6 +8,12 @@ module.exports = {
       { type: queryInterface.sequelize.QueryTypes.SELECT }
     );
 
+    const orgs = await queryInterface.sequelize.query(
+      "SELECT id FROM Organizations LIMIT 1;",
+      { type: queryInterface.sequelize.QueryTypes.SELECT }
+    );
+    const defaultOrgId = (orgs && orgs.length > 0) ? orgs[0].id : 1;
+
     const quizMap = {};
     (quizzes || []).forEach(q => {
       quizMap[q.title] = q.id;
@@ -20,6 +26,7 @@ module.exports = {
     await queryInterface.bulkInsert('Questions', [
       {
         quiz_id: jsQuizId,
+        organization_id: defaultOrgId,
         question_text: 'Which keyword declares a block-scoped variable in modern JavaScript?',
         options: JSON.stringify(['var', 'let', 'global', 'define']),
         correct_answer: 'let',
@@ -30,6 +37,7 @@ module.exports = {
       },
       {
         quiz_id: jsQuizId,
+        organization_id: defaultOrgId,
         question_text: 'What will typeof NaN return in JavaScript?',
         options: JSON.stringify(['number', 'NaN', 'undefined', 'object']),
         correct_answer: 'number',
@@ -40,6 +48,7 @@ module.exports = {
       },
       {
         quiz_id: jsQuizId,
+        organization_id: defaultOrgId,
         question_text: 'What is a closure in JavaScript?',
         options: JSON.stringify([
           'A function bundled with references to its surrounding lexical state',
@@ -55,6 +64,7 @@ module.exports = {
       },
       {
         quiz_id: diagQuizId,
+        organization_id: defaultOrgId,
         question_text: 'Which JavaScript operator provides a safe way to access deeply nested object properties without throwing TypeError if an intermediate reference is null or undefined?',
         options: JSON.stringify(['Optional chaining (?.)', 'Nullish coalescing (??)', 'Spread operator (...)', 'Logical OR (||)']),
         correct_answer: 'Optional chaining (?.)',
@@ -65,6 +75,7 @@ module.exports = {
       },
       {
         quiz_id: diagQuizId,
+        organization_id: defaultOrgId,
         question_text: 'In Python, what is the key difference between "==" and "is"?',
         options: JSON.stringify([
           '"==" checks value equality; "is" checks object identity in memory',
@@ -80,6 +91,7 @@ module.exports = {
       },
       {
         quiz_id: diagQuizId,
+        organization_id: defaultOrgId,
         question_text: 'Which normal form is violated if a non-key attribute depends on another non-key attribute (Transitive Dependency)?',
         options: JSON.stringify(['Third Normal Form (3NF)', 'First Normal Form (1NF)', 'Second Normal Form (2NF)', 'Boyce-Codd Normal Form (BCNF)']),
         correct_answer: 'Third Normal Form (3NF)',
@@ -90,6 +102,7 @@ module.exports = {
       },
       {
         quiz_id: diagQuizId,
+        organization_id: defaultOrgId,
         question_text: 'What will happen if you call a React state setter with the exact same primitive value as current state (e.g. setCount(5) when count is 5)?',
         options: JSON.stringify([
           'React bails out of re-rendering the component and its children',
@@ -105,6 +118,7 @@ module.exports = {
       },
       {
         quiz_id: diagQuizId,
+        organization_id: defaultOrgId,
         question_text: 'What is the average time complexity of finding an item in a balanced Binary Search Tree (AVL or Red-Black Tree)?',
         options: JSON.stringify(['O(log N)', 'O(1)', 'O(N)', 'O(N log N)']),
         correct_answer: 'O(log N)',
