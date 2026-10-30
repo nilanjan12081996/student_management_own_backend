@@ -294,5 +294,6 @@ def api_student_progress_analysis(payload: ProgressAnalysisRequest):
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5001))
-    print(f"🚀 Starting Multi-Layer Python AI Service on http://127.0.0.1:{port}")
-    uvicorn.run(app, host="127.0.0.1", port=port)
+    host = os.getenv("HOST", "0.0.0.0")
+    print(f"Starting Multi-Layer Python AI Service on http://{host}:{port}")
+    uvicorn.run(app, host=host, port=port)
