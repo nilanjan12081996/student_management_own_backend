@@ -3,7 +3,7 @@ require('dotenv').config();
 const baseDialectOptions = process.env.DB_SSL === 'true' ? {
   ssl: {
     minVersion: 'TLSv1.2',
-    rejectUnauthorized: true
+    rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true'
   }
 } : {};
 
