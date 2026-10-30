@@ -1,31 +1,7 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "services": {
-    "app": {
-      "root": ".",
-      "framework": "express",
-      "entrypoint": "index.js",
-      "bindings": [
-        {
-          "type": "service",
-          "service": "python",
-          "format": "url",
-          "env": "PYTHON_URL"
-        }
-      ]
-    },
-    "python": {
-      "root": "python",
-      "entrypoint": "main:app"
-    }
-  },
+  "version": 2,
   "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": {
-        "service": "app"
-      }
-    }
+    { "source": "/(.*)", "destination": "/" }
   ],
   "headers": [
     {
