@@ -43,15 +43,36 @@ const countStudentsForBatch = (batch, students) => {
         }
         const sClass = (s.class || '').trim().toLowerCase();
         const sCourse = (s.course || '').trim().toLowerCase();
+        const sSemester = (s.semester || '').trim().toLowerCase();
         const sCode = (s.tuition_code || '').trim().toUpperCase();
         const sBatchId = s.batch_id ? String(s.batch_id) : '';
 
-        return (
-            (bName && sClass === bName) ||
-            (bCode && sCode === bCode) ||
-            (bId && sBatchId === bId) ||
-            (bName && sCourse === bName)
-        );
+        // 1. Explicit direct match
+        if (bName && sClass === bName) return true;
+        if (bCode && sCode === bCode) return true;
+        if (bId && sBatchId === bId) return true;
+        if (bName && sCourse === bName) return true;
+
+        // 2. Check semester number in batch name (e.g. "Sem 3", "Semester 3")
+        const batchSemMatch = bName.match(/(?:sem(?:ester)?[\s-]*(\d+)|(\d+)(?:st|nd|rd|th)?[\s-]*sem)/i);
+        const studentSemMatch = sSemester.match(/(\d+)/);
+
+        if (batchSemMatch && studentSemMatch) {
+            const batchSemNum = batchSemMatch[1] || batchSemMatch[2];
+            const studentSemNum = studentSemMatch[1];
+            if (batchSemNum !== studentSemNum) {
+                return false;
+            }
+            return true;
+        }
+
+        // 3. Substring match
+        if (bName && bName.length > 3) {
+            if (sClass && sClass.includes(bName)) return true;
+            if (sCourse && sCourse.includes(bName)) return true;
+        }
+
+        return false;
     }).length;
 };
 
@@ -69,7 +90,7 @@ const getAllBatches = async (req, res) => {
         try {
             students = await User.findAll({
                 where: { role: 'student' },
-                attributes: ['id', 'name', 'email', 'class', 'course', 'tuition_code', 'organization_id']
+                attributes: ['id', 'name', 'email', 'class', 'course', 'semester', 'tuition_code', 'organization_id']
             });
         } catch (_) {}
 
@@ -116,7 +137,7 @@ const getBatchById = async (req, res) => {
         try {
             students = await User.findAll({
                 where: { role: 'student' },
-                attributes: ['id', 'name', 'email', 'class', 'course', 'tuition_code', 'organization_id']
+                attributes: ['id', 'name', 'email', 'class', 'course', 'semester', 'tuition_code', 'organization_id']
             });
         } catch (_) {}
 
