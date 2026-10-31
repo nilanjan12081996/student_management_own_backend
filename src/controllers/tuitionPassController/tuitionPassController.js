@@ -214,6 +214,10 @@ const createTuitionPass = async (req, res) => {
         user.tuition_code =
             tuitionCode;
 
+        if (batch_name) {
+            user.class = batch_name;
+        }
+
 
         // Assign organization if supplied
         if (organization_id) {
