@@ -463,9 +463,12 @@ const updateUser = async (req, res) => {
 
         await user.save();
 
+        const userData = user.toJSON();
+        delete userData.password;
+
         return res.status(200).json({
-            message:
-                "User updated successfully"
+            message: "User updated successfully",
+            user: userData
         });
 
     } catch (error) {
