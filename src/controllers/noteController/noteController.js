@@ -18,7 +18,8 @@ const createNote = async (req, res) => {
             class: noteClass,
             semester,
             content_type,
-            content_url
+            content_url,
+            organization_id: req.body.organization_id || 1
         });
 
         res.status(201).json({
@@ -110,12 +111,12 @@ const updateNote = async (req, res) => {
         } = req.body;
 
         await note.update({
-            title,
-            topic,
-            class: noteClass,
-            semester,
-            content_type,
-            content_url
+            title: title !== undefined ? title : note.title,
+            topic: topic !== undefined ? topic : note.topic,
+            class: noteClass !== undefined ? noteClass : note.class,
+            semester: semester !== undefined ? semester : note.semester,
+            content_type: content_type !== undefined ? content_type : note.content_type,
+            content_url: content_url !== undefined ? content_url : note.content_url
         });
 
         res.status(200).json({
