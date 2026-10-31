@@ -454,17 +454,17 @@ const updateUser = async (req, res) => {
         }
 
         if (
-            studentClass ||
-            req.body.class
+            studentClass !== undefined ||
+            req.body.class !== undefined
         ) {
             user.class =
-                studentClass ||
-                req.body.class;
+                studentClass !== undefined
+                    ? studentClass
+                    : req.body.class;
         }
 
-        if (semester) {
-            user.semester =
-                semester;
+        if (semester !== undefined) {
+            user.semester = semester;
         }
 
         if (course) {

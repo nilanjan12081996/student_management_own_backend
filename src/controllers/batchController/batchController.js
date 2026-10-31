@@ -31,9 +31,12 @@ const createBatch = async (req, res) => {
 };
 
 
+const normalizeStr = (str) => (str || '').toString().toLowerCase().replace(/[^a-z0-9]/g, '');
+
 // Helper to calculate student count for a batch (strictly assigned students only)
 const countStudentsForBatch = (batch, students) => {
     const bName = (batch.name || '').trim().toLowerCase();
+    const bNameNorm = normalizeStr(batch.name);
     const bCode = (batch.join_code || '').trim().toUpperCase();
     const bId = String(batch.id);
 
@@ -42,14 +45,20 @@ const countStudentsForBatch = (batch, students) => {
             return false;
         }
         const sClass = (s.class || '').trim().toLowerCase();
+        const sClassNorm = normalizeStr(s.class);
+        const sBatchName = (s.batch_name || '').trim().toLowerCase();
+        const sBatchNameNorm = normalizeStr(s.batch_name);
         const sCode = (s.tuition_code || '').trim().toUpperCase();
         const sBatchId = s.batch_id ? String(s.batch_id) : '';
 
         // Strictly assigned to this batch
         return (
             (bName && sClass === bName) ||
-            (bCode && sCode === bCode) ||
-            (bId && sBatchId === bId)
+            (bNameNorm && sClassNorm === bNameNorm) ||
+            (bName && sBatchName === bName) ||
+            (bNameNorm && sBatchNameNorm === bNameNorm) ||
+            (bCode && (sCode === bCode || sClass.toUpperCase() === bCode)) ||
+            (bId && (sBatchId === bId || sClass === bId))
         );
     }).length;
 };
@@ -67,10 +76,12 @@ const getAllBatches = async (req, res) => {
         let students = [];
         try {
             students = await User.findAll({
-                where: { role: 'student' },
-                attributes: ['id', 'name', 'email', 'class', 'course', 'semester', 'tuition_code', 'organization_id']
+                attributes: { exclude: ['password'] }
             });
-        } catch (_) {}
+            students = students.filter(u => !u.role || u.role.toLowerCase() === 'student');
+        } catch (err) {
+            console.error('Failed to query students for batches:', err.message);
+        }
 
         const batchesWithCounts = batches.map(batch => {
             const batchJson = batch.toJSON();
@@ -114,10 +125,12 @@ const getBatchById = async (req, res) => {
         let students = [];
         try {
             students = await User.findAll({
-                where: { role: 'student' },
-                attributes: ['id', 'name', 'email', 'class', 'course', 'semester', 'tuition_code', 'organization_id']
+                attributes: { exclude: ['password'] }
             });
-        } catch (_) {}
+            students = students.filter(u => !u.role || u.role.toLowerCase() === 'student');
+        } catch (err) {
+            console.error('Failed to query students for batch by ID:', err.message);
+        }
 
         batchJson.student_count = countStudentsForBatch(batch, students);
 
