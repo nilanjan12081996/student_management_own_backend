@@ -10,6 +10,12 @@ router.post("/create", userController.createUser);
 // Login user
 router.post("/login", userController.loginUser);
 
+// Forgot password
+router.post("/forgot-password", userController.forgotPassword);
+
+// Reset password
+router.post("/reset-password", userController.resetPassword);
+
 // Get all users
 router.get("/getAll", userController.getAllUsers);
 
