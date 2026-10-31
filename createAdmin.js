@@ -27,7 +27,7 @@ async function createAdmin() {
     user.role = 'admin';
     user.status = 'active';
     await user.save();
-    console.log(`✅ Admin user '${email}' already exists. Password updated to '${password}' and role set to 'admin'.`);
+    console.log(`✅ Admin user '${email}'  already exists. Password updated to '${password}' and role set to 'admin'.`);
   } else {
     console.log(`✅ Admin user '${email}' created successfully with role 'admin' and status 'active'!`);
   }
