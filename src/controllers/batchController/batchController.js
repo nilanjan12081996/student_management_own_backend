@@ -108,10 +108,10 @@ const updateBatch = async (req, res) => {
         } = req.body;
 
         await batch.update({
-            organization_id,
-            name,
-            subject,
-            join_code
+            organization_id: organization_id || batch.organization_id,
+            name: name !== undefined ? name : batch.name,
+            subject: subject !== undefined ? subject : batch.subject,
+            join_code: join_code || batch.join_code
         });
 
         res.status(200).json({
