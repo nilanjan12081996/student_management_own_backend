@@ -9,6 +9,17 @@ async function createAdmin() {
 
   console.log(`Creating/Updating admin: ${email}...`);
 
+  // Ensure reset password columns exist before querying
+  const alterQueries = [
+    "ALTER TABLE Users ADD COLUMN reset_password_token VARCHAR(255) NULL",
+    "ALTER TABLE Users ADD COLUMN reset_password_expires DATETIME NULL",
+    "ALTER TABLE users ADD COLUMN reset_password_token VARCHAR(255) NULL",
+    "ALTER TABLE users ADD COLUMN reset_password_expires DATETIME NULL"
+  ];
+  for (const sql of alterQueries) {
+    try { await User.sequelize.query(sql); } catch (_) {}
+  }
+
   const hashedPassword = await bcrypt.hash(password, 10);
   const [user, created] = await User.findOrCreate({
     where: { email: email.trim().toLowerCase() },

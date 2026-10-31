@@ -4,6 +4,14 @@ const userController = require("../../controllers/userController");
 
 const router = express.Router();
 
+// Auto-heal reset password columns before processing any user requests
+router.use(async (req, res, next) => {
+    try {
+        await userController.ensureResetColumns();
+    } catch (_) {}
+    next();
+});
+
 // Create/Register user
 router.post("/create", userController.createUser);
 

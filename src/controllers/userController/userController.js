@@ -7,24 +7,23 @@ let resetColumnsEnsured = false;
 const ensureResetColumns = async () => {
     if (resetColumnsEnsured) return;
     try {
-        const queryInterface = User.sequelize.getQueryInterface();
-        const tableDescription = await queryInterface.describeTable('Users');
-
-        if (!tableDescription.reset_password_token) {
-            await queryInterface.addColumn('Users', 'reset_password_token', {
-                type: User.sequelize.Sequelize.STRING,
-                allowNull: true
-            });
-        }
-        if (!tableDescription.reset_password_expires) {
-            await queryInterface.addColumn('Users', 'reset_password_expires', {
-                type: User.sequelize.Sequelize.DATE,
-                allowNull: true
-            });
+        const sequelize = User.sequelize;
+        const alterQueries = [
+            "ALTER TABLE Users ADD COLUMN reset_password_token VARCHAR(255) NULL",
+            "ALTER TABLE Users ADD COLUMN reset_password_expires DATETIME NULL",
+            "ALTER TABLE users ADD COLUMN reset_password_token VARCHAR(255) NULL",
+            "ALTER TABLE users ADD COLUMN reset_password_expires DATETIME NULL"
+        ];
+        for (const sql of alterQueries) {
+            try {
+                await sequelize.query(sql);
+            } catch (_) {
+                // Column already exists or table casing variance
+            }
         }
         resetColumnsEnsured = true;
     } catch (err) {
-        console.warn('Could not auto-add reset password columns (they might already exist):', err.message);
+        console.warn('ensureResetColumns note:', err.message);
         resetColumnsEnsured = true;
     }
 };
@@ -34,6 +33,7 @@ const ensureResetColumns = async () => {
 // ======================================================
 const createUser = async (req, res) => {
     try {
+        await ensureResetColumns();
         const {
             name,
             email,
@@ -177,6 +177,7 @@ const createUser = async (req, res) => {
 // ======================================================
 const loginUser = async (req, res) => {
     try {
+        await ensureResetColumns();
 
         const {
             email,
@@ -699,5 +700,6 @@ module.exports = {
     updateUser:updateUser,
     deleteUser:deleteUser,
     forgotPassword:forgotPassword,
-    resetPassword:resetPassword
+    resetPassword:resetPassword,
+    ensureResetColumns:ensureResetColumns
 };
