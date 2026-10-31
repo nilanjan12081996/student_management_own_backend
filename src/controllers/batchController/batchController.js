@@ -34,8 +34,8 @@ const createBatch = async (req, res) => {
 // Helper to calculate student count for a batch
 const countStudentsForBatch = (batch, students) => {
     const bName = (batch.name || '').trim().toLowerCase();
-    const bSubject = (batch.subject || '').trim().toLowerCase();
     const bCode = (batch.join_code || '').trim().toUpperCase();
+    const bId = String(batch.id);
 
     return students.filter(s => {
         if (batch.organization_id && s.organization_id && Number(batch.organization_id) !== Number(s.organization_id)) {
@@ -44,11 +44,12 @@ const countStudentsForBatch = (batch, students) => {
         const sClass = (s.class || '').trim().toLowerCase();
         const sCourse = (s.course || '').trim().toLowerCase();
         const sCode = (s.tuition_code || '').trim().toUpperCase();
+        const sBatchId = s.batch_id ? String(s.batch_id) : '';
 
         return (
             (bName && sClass === bName) ||
             (bCode && sCode === bCode) ||
-            (bSubject && sClass === bSubject) ||
+            (bId && sBatchId === bId) ||
             (bName && sCourse === bName)
         );
     }).length;
