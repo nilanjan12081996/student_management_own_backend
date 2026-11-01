@@ -2,6 +2,14 @@ const express = require("express");
 const noteController = require("../../controllers/noteController/noteController");
 const router = express.Router();
 
+// Auto-heal notes columns (batch_id, batch_name) before processing note requests
+router.use(async (req, res, next) => {
+    try {
+        await noteController.ensureNoteColumns();
+    } catch (_) {}
+    next();
+});
+
 // Create a note
 router.post("/createNote", noteController.createNote);
 router.post("/create", noteController.createNote);

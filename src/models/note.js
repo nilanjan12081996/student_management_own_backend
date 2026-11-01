@@ -18,6 +18,8 @@ module.exports = (sequelize, DataTypes) => {
     topic: DataTypes.STRING,
     class: DataTypes.STRING,
     semester: DataTypes.STRING,
+    batch_id: DataTypes.INTEGER,
+    batch_name: DataTypes.STRING,
     content_type: DataTypes.ENUM('text', 'pdf'),
     content_url: DataTypes.TEXT,
     organization_id: DataTypes.INTEGER

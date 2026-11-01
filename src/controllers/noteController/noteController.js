@@ -1,25 +1,62 @@
 const { Note } = require("../../models");
 
+let noteColumnsEnsured = false;
+const ensureNoteColumns = async () => {
+    if (noteColumnsEnsured) return;
+    try {
+        const sequelize = Note.sequelize;
+        const alterQueries = [
+            "ALTER TABLE Notes ADD COLUMN batch_id INT NULL",
+            "ALTER TABLE Notes ADD COLUMN batch_name VARCHAR(255) NULL",
+            "ALTER TABLE notes ADD COLUMN batch_id INT NULL",
+            "ALTER TABLE notes ADD COLUMN batch_name VARCHAR(255) NULL"
+        ];
+        for (const sql of alterQueries) {
+            try {
+                await sequelize.query(sql);
+            } catch (_) {}
+        }
+        noteColumnsEnsured = true;
+    } catch (err) {
+        console.warn('ensureNoteColumns note:', err.message);
+        noteColumnsEnsured = true;
+    }
+};
+
 // Create a new note
 const createNote = async (req, res) => {
     try {
+        await ensureNoteColumns();
         const {
             title,
             topic,
             class: noteClass,
             semester,
             content_type,
-            content_url
+            content_url,
+            batch_id,
+            batch_name,
+            organization_id
         } = req.body;
+
+        const resolvedBatchId = batch_id && batch_id !== 'all' ? Number(batch_id) : null;
+        const resolvedBatchName = batch_name && batch_name !== 'All Batches' && batch_name !== 'all'
+            ? batch_name
+            : (resolvedBatchId ? null : 'All Batches');
+        const finalClass = (resolvedBatchName && resolvedBatchName !== 'All Batches')
+            ? resolvedBatchName
+            : (noteClass || 'All Classes');
 
         const note = await Note.create({
             title,
             topic,
-            class: noteClass,
+            class: finalClass,
             semester,
+            batch_id: resolvedBatchId,
+            batch_name: resolvedBatchName,
             content_type,
             content_url,
-            organization_id: req.body.organization_id || 1
+            organization_id: organization_id || 1
         });
 
         res.status(201).json({
@@ -41,7 +78,16 @@ const createNote = async (req, res) => {
 // Get all notes
 const getAllNotes = async (req, res) => {
     try {
-        const notes = await Note.findAll();
+        await ensureNoteColumns();
+        const where = {};
+        if (req.query.organization_id) {
+            where.organization_id = Number(req.query.organization_id);
+        }
+
+        const notes = await Note.findAll({
+            where,
+            order: [['createdAt', 'DESC']]
+        });
 
         res.status(200).json({
             message: 'Notes fetched successfully',
@@ -62,6 +108,7 @@ const getAllNotes = async (req, res) => {
 // Get a single note by ID
 const getNoteById = async (req, res) => {
     try {
+        await ensureNoteColumns();
         const { id } = req.params;
 
         const note = await Note.findByPk(id);
@@ -91,6 +138,7 @@ const getNoteById = async (req, res) => {
 // Update a note
 const updateNote = async (req, res) => {
     try {
+        await ensureNoteColumns();
         const { id } = req.params;
 
         const note = await Note.findByPk(id);
@@ -104,17 +152,31 @@ const updateNote = async (req, res) => {
         const {
             title,
             topic,
-             class: noteClass,
+            class: noteClass,
             semester,
             content_type,
-            content_url
+            content_url,
+            batch_id,
+            batch_name
         } = req.body;
+
+        const resolvedBatchId = batch_id !== undefined
+            ? (batch_id && batch_id !== 'all' ? Number(batch_id) : null)
+            : note.batch_id;
+        const resolvedBatchName = batch_name !== undefined
+            ? (batch_name && batch_name !== 'All Batches' && batch_name !== 'all' ? batch_name : (resolvedBatchId ? null : 'All Batches'))
+            : note.batch_name;
+        const finalClass = (resolvedBatchName && resolvedBatchName !== 'All Batches')
+            ? resolvedBatchName
+            : (noteClass !== undefined ? noteClass : note.class);
 
         await note.update({
             title: title !== undefined ? title : note.title,
             topic: topic !== undefined ? topic : note.topic,
-            class: noteClass !== undefined ? noteClass : note.class,
+            class: finalClass,
             semester: semester !== undefined ? semester : note.semester,
+            batch_id: resolvedBatchId,
+            batch_name: resolvedBatchName,
             content_type: content_type !== undefined ? content_type : note.content_type,
             content_url: content_url !== undefined ? content_url : note.content_url
         });
@@ -138,6 +200,7 @@ const updateNote = async (req, res) => {
 // Delete a note
 const deleteNote = async (req, res) => {
     try {
+        await ensureNoteColumns();
         const { id } = req.params;
 
         const note = await Note.findByPk(id);
@@ -166,9 +229,10 @@ const deleteNote = async (req, res) => {
 
 
 module.exports = {
-    createNote:createNote,
-    getAllNotes:getAllNotes,
-    getNoteById:getNoteById,
-    updateNote:updateNote,
-    deleteNote:deleteNote
+    createNote: createNote,
+    getAllNotes: getAllNotes,
+    getNoteById: getNoteById,
+    updateNote: updateNote,
+    deleteNote: deleteNote,
+    ensureNoteColumns: ensureNoteColumns
 };
