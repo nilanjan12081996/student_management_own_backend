@@ -23,6 +23,16 @@ const ensureNoteColumns = async () => {
     }
 };
 
+// Helper: Auto-detect semester number from batch or class names (e.g. "BCA sem3" -> "Semester 3")
+const inferSemesterFromText = (text, fallback = null) => {
+    if (!text) return fallback;
+    const match1 = text.match(/sem(?:ester)?\s*(\d+)/i);
+    if (match1 && match1[1]) return `Semester ${match1[1]}`;
+    const match2 = text.match(/(\d+)(?:st|nd|rd|th)?\s*sem/i);
+    if (match2 && match2[1]) return `Semester ${match2[1]}`;
+    return fallback;
+};
+
 // Create a new note
 const createNote = async (req, res) => {
     try {
@@ -47,11 +57,15 @@ const createNote = async (req, res) => {
             ? resolvedBatchName
             : (noteClass || 'All Classes');
 
+        // Automatically infer true semester from batch/class if semester was defaulted to 'Semester 1' or omitted
+        const detectedSemester = inferSemesterFromText(`${resolvedBatchName || ''} ${finalClass || ''}`);
+        const resolvedSemester = detectedSemester || semester || 'Semester 1';
+
         const note = await Note.create({
             title,
             topic,
             class: finalClass,
-            semester,
+            semester: resolvedSemester,
             batch_id: resolvedBatchId,
             batch_name: resolvedBatchName,
             content_type,
@@ -89,6 +103,17 @@ const getAllNotes = async (req, res) => {
             order: [['createdAt', 'DESC']]
         });
 
+        // Auto-heal existing notes where batch/class specifies semester (e.g. "BCA sem3") but was saved as "Semester 1"
+        for (const n of notes) {
+            const detected = inferSemesterFromText(`${n.batch_name || ''} ${n.class || ''}`);
+            if (detected && n.semester !== detected && (n.semester === 'Semester 1' || !n.semester || n.semester === 'None')) {
+                try {
+                    await n.update({ semester: detected });
+                    n.semester = detected;
+                } catch (_) {}
+            }
+        }
+
         res.status(200).json({
             message: 'Notes fetched successfully',
             notes
@@ -117,6 +142,15 @@ const getNoteById = async (req, res) => {
             return res.status(404).json({
                 message: 'Note not found'
             });
+        }
+
+        // Auto-heal semester if detected from batch/class
+        const detected = inferSemesterFromText(`${note.batch_name || ''} ${note.class || ''}`);
+        if (detected && note.semester !== detected && (note.semester === 'Semester 1' || !note.semester)) {
+            try {
+                await note.update({ semester: detected });
+                note.semester = detected;
+            } catch (_) {}
         }
 
         res.status(200).json({
@@ -170,11 +204,16 @@ const updateNote = async (req, res) => {
             ? resolvedBatchName
             : (noteClass !== undefined ? noteClass : note.class);
 
+        const detectedSemester = inferSemesterFromText(`${resolvedBatchName || ''} ${finalClass || ''}`);
+        const resolvedSemester = semester !== undefined
+            ? ((semester === 'Semester 1' && detectedSemester) ? detectedSemester : semester)
+            : (detectedSemester || note.semester);
+
         await note.update({
             title: title !== undefined ? title : note.title,
             topic: topic !== undefined ? topic : note.topic,
             class: finalClass,
-            semester: semester !== undefined ? semester : note.semester,
+            semester: resolvedSemester,
             batch_id: resolvedBatchId,
             batch_name: resolvedBatchName,
             content_type: content_type !== undefined ? content_type : note.content_type,
@@ -227,12 +266,10 @@ const deleteNote = async (req, res) => {
     }
 };
 
-
 module.exports = {
-    createNote: createNote,
-    getAllNotes: getAllNotes,
-    getNoteById: getNoteById,
-    updateNote: updateNote,
-    deleteNote: deleteNote,
-    ensureNoteColumns: ensureNoteColumns
+    createNote,
+    getAllNotes,
+    getNoteById,
+    updateNote,
+    deleteNote
 };
