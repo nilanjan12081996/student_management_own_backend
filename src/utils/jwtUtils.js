@@ -48,3 +48,4 @@ module.exports = {
   generateUserToken,
   verifyUserToken
 };
+
