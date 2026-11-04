@@ -2,6 +2,7 @@ const { User } = require("../../models");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const mailer = require("../../utils/mailer");
+const { generateUserToken } = require("../../utils/jwtUtils");
 
 let resetColumnsEnsured = false;
 const ensureResetColumns = async () => {
@@ -147,10 +148,12 @@ const createUser = async (req, res) => {
         // --------------------------------------------------
         // ADMIN-SIDE ENROLLMENT
         // --------------------------------------------------
+        const token = generateUserToken(user);
+
         return res.status(201).json({
             message:
                 "User created successfully",
-
+            token,
             user: userData
         });
 
@@ -287,10 +290,12 @@ const loginUser = async (req, res) => {
 
         delete userData.password;
 
+        const token = generateUserToken(user);
+
         return res.status(200).json({
             message:
                 "Login successful",
-
+            token,
             user:
                 userData
         });

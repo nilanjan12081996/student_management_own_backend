@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const zlib = require('zlib');
 const path = require('path');
+const { authenticateToken, requireAdmin } = require('../../middleware/authMiddleware');
 
 const PYTHON_PORT = process.env.PYTHON_PORT || 5001;
 
@@ -352,7 +353,7 @@ const restrictStudentAiAccess = (req, res, next) => {
 // =====================================================================
 
 // GET /api/ai/health
-router.get('/health', restrictStudentAiAccess, async (req, res) => {
+router.get('/health', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const pyRes = await forwardToPython('/health', 'GET');
     return res.status(pyRes.status).json(pyRes.data);
@@ -376,7 +377,7 @@ router.get('/health', restrictStudentAiAccess, async (req, res) => {
 
 // POST /api/ai/generate-mcqs
 // Supports: topic, count, difficulty, batch_name, cognitive_layer, reference_text, file_name, file_base64
-router.post('/generate-mcqs', restrictStudentAiAccess, async (req, res) => {
+router.post('/generate-mcqs', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const {
       topic = 'General Science',
@@ -489,7 +490,7 @@ Format schema:
 });
 
 // POST /api/ai/generate-notes
-router.post('/generate-notes', restrictStudentAiAccess, async (req, res) => {
+router.post('/generate-notes', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { topic = 'General Topic', subject = 'Computer Science', style = 'Detailed Guide', reference_text = '' } = req.body;
 
@@ -525,7 +526,7 @@ Include:
 });
 
 // POST /api/ai/analyze-quiz
-router.post('/analyze-quiz', async (req, res) => {
+router.post('/analyze-quiz', authenticateToken, async (req, res) => {
   try {
     const { student_name = 'Student', quiz_title = 'Assessment', score = 0, total_marks = 10, wrong_questions = [] } = req.body;
 
@@ -552,7 +553,7 @@ router.post('/analyze-quiz', async (req, res) => {
 });
 
 // POST /api/ai/student-progress-analysis
-router.post('/student-progress-analysis', async (req, res) => {
+router.post('/student-progress-analysis', authenticateToken, async (req, res) => {
   try {
     const { student_name = 'Student', submissions = [] } = req.body;
     return res.json({
