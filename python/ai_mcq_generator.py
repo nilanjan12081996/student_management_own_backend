@@ -43,7 +43,8 @@ def generate_mcqs_with_gemini(
     difficulty: str,
     count: int,
     batch_name: str = "",
-    cognitive_layer: str = "Multi-Layer Balanced"
+    cognitive_layer: str = "Multi-Layer Balanced",
+    reference_text: str = ""
 ) -> Optional[List[Dict]]:
     """Generates multi-layered MCQs using Google Gemini SDK."""
     api_key = os.getenv("GEMINI_API_KEY")
@@ -54,14 +55,16 @@ def generate_mcqs_with_gemini(
         from google import genai
         client = genai.Client(api_key=api_key)
 
+        ref_block = f"\nREFERENCE MATERIAL:\n---\n{reference_text[:15000]}\n---\n" if reference_text else ""
         prompt = f"""
 You are an elite academic professor and question design specialist.
-Create exactly {count} multi-layered multiple-choice assessment questions for students.
+Create exactly {count} multi-layered multiple-choice assessment questions for students based on the provided reference material or topic.
 
 Topic: {topic}
 Difficulty Level: {difficulty}
 Target Cohort: {batch_name or "Advanced Academic Cohort"}
 Cognitive Layer Focus: {cognitive_layer}
+{ref_block}
 
 Design the quiz spanning these 4 pedagogical layers:
 - Layer 1: Concept Foundation & Syntax (Definitions, Core Principles)
@@ -429,10 +432,11 @@ def generate_mcqs(
     difficulty: str = "Intermediate",
     count: int = 5,
     batch_name: str = "",
-    cognitive_layer: str = "Multi-Layer Balanced"
+    cognitive_layer: str = "Multi-Layer Balanced",
+    reference_text: str = ""
 ) -> List[Dict]:
     """Generates multi-layered MCQs using Gemini SDK first, with intelligent domain fallback."""
-    questions = generate_mcqs_with_gemini(topic, difficulty, count, batch_name, cognitive_layer)
+    questions = generate_mcqs_with_gemini(topic, difficulty, count, batch_name, cognitive_layer, reference_text)
     if questions:
         return questions
     return generate_mcqs_fallback(topic, difficulty, count, batch_name, cognitive_layer)
