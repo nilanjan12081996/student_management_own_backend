@@ -3,6 +3,7 @@ const router = express.Router();
 const zlib = require('zlib');
 const path = require('path');
 const { authenticateToken, requireAdmin } = require('../../middleware/authMiddleware');
+const { generateSmartQuestions } = require('../../utils/curriculumQuestions');
 
 const PYTHON_PORT = process.env.PYTHON_PORT || 5001;
 
@@ -393,8 +394,17 @@ router.post('/generate-mcqs', authenticateToken, requireAdmin, async (req, res) 
 
     const parsedCount = Math.max(1, Math.min(50, Number(count) || 5));
 
+    // Filter out any placeholder strings like "[Document attached: ..."
+    let effectiveReferenceText = (reference_text || '').trim();
+    if (
+      effectiveReferenceText.startsWith('[Document attached:') ||
+      effectiveReferenceText.includes('Ready for AI reference parsing') ||
+      effectiveReferenceText.length < 35
+    ) {
+      effectiveReferenceText = '';
+    }
+
     // If PDF base64 provided and reference_text empty, extract text stream
-    let effectiveReferenceText = reference_text;
     if (file_base64 && !effectiveReferenceText) {
       effectiveReferenceText = extractTextFromPdfBase64(file_base64);
     }
@@ -463,21 +473,21 @@ Format schema:
       }
     } catch (_) {}
 
-    // Attempt 3: Pure Node.js Contextual Reference-Based Synthesizer (Guaranteed on Live Server)
-    const questions = synthesizeMcqsFromReference(
-      effectiveReferenceText,
+    // Attempt 3: Pure Node.js Academic Curriculum & Reference-Based Synthesizer (Zero-Failure)
+    const questions = generateSmartQuestions({
       topic,
-      parsedCount,
+      referenceText: effectiveReferenceText,
+      count: parsedCount,
       difficulty,
-      cognitive_layer
-    );
+      cognitiveLayer: cognitive_layer
+    });
 
     return res.json({
       success: true,
       questions,
       count: questions.length,
-      engine: 'Node.js Contextual Reference Engine',
-      source: effectiveReferenceText ? `Reference Document (${file_name || 'Uploaded Text'})` : 'Curriculum Knowledge Base'
+      engine: 'Academic Curriculum Knowledge Engine',
+      source: effectiveReferenceText ? `Reference Document (${file_name || 'Uploaded Text'})` : 'Academic Curriculum Knowledge Base'
     });
 
   } catch (err) {
