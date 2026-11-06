@@ -27,7 +27,10 @@ module.exports = (sequelize, DataTypes) => {
     organization_id: DataTypes.INTEGER,
     title: DataTypes.STRING,
     month: DataTypes.STRING,
-    total_marks: DataTypes.INTEGER
+    total_marks: DataTypes.INTEGER,
+    batch_id: DataTypes.INTEGER,
+    batch_name: DataTypes.STRING,
+    class: DataTypes.STRING
   }, {
     sequelize,
     modelName: 'Quiz',

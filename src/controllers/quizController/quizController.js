@@ -15,6 +15,32 @@ const formatOptions = (options) => {
   return options;
 };
 
+// Auto-heal database schema for batch assignments on quizzes
+let quizColumnsEnsured = false;
+const ensureQuizColumns = async () => {
+  if (quizColumnsEnsured) return;
+  try {
+    const sequelize = Quiz.sequelize;
+    const alterQueries = [
+      "ALTER TABLE Quizzes ADD COLUMN batch_id INT NULL",
+      "ALTER TABLE Quizzes ADD COLUMN batch_name VARCHAR(255) NULL",
+      "ALTER TABLE Quizzes ADD COLUMN class VARCHAR(255) NULL",
+      "ALTER TABLE quizzes ADD COLUMN batch_id INT NULL",
+      "ALTER TABLE quizzes ADD COLUMN batch_name VARCHAR(255) NULL",
+      "ALTER TABLE quizzes ADD COLUMN class VARCHAR(255) NULL"
+    ];
+    for (const sql of alterQueries) {
+      try {
+        await sequelize.query(sql);
+      } catch (_) {}
+    }
+    quizColumnsEnsured = true;
+  } catch (err) {
+    console.warn('ensureQuizColumns note:', err.message);
+    quizColumnsEnsured = true;
+  }
+};
+
 // AI Microservice Helper for Quiz Performance Analysis
 async function callAiAnalyze(payload) {
   try {
@@ -140,7 +166,8 @@ function generateLocalAnalysis(studentName, quizTitle, score, totalMarks, wrongQ
 // Create a new quiz (supports optional nested questions)
 const createQuiz = async (req, res) => {
   try {
-    const { title, field, month, total_marks, questions, organization_id } = req.body;
+    await ensureQuizColumns();
+    const { title, field, month, total_marks, questions, organization_id, batch_id, batch_name, class: quizClass } = req.body;
     const quizTitle = title || field;
 
     if (!quizTitle) {
@@ -152,11 +179,22 @@ const createQuiz = async (req, res) => {
       computedTotalMarks = questions.reduce((sum, q) => sum + (Number(q.marks) || 1), 0);
     }
 
+    const resolvedBatchId = batch_id && batch_id !== 'all' ? Number(batch_id) : null;
+    const resolvedBatchName = batch_name && batch_name !== 'All Batches' && batch_name !== 'all'
+      ? batch_name
+      : (resolvedBatchId ? null : 'All Batches');
+    const finalClass = (resolvedBatchName && resolvedBatchName !== 'All Batches')
+      ? resolvedBatchName
+      : (quizClass || 'All Classes');
+
     const quiz = await Quiz.create({
       organization_id: organization_id || 1,
       title: quizTitle,
       month: month || 'Unassigned',
-      total_marks: computedTotalMarks !== undefined ? computedTotalMarks : 0
+      total_marks: computedTotalMarks !== undefined ? computedTotalMarks : 0,
+      batch_id: resolvedBatchId,
+      batch_name: resolvedBatchName,
+      class: finalClass
     });
 
     let createdQuestions = [];
@@ -196,7 +234,8 @@ const createQuiz = async (req, res) => {
 // Get all quizzes
 const getAllQuizzes = async (req, res) => {
   try {
-    const { field, title, month, search, includeQuestions } = req.query;
+    await ensureQuizColumns();
+    const { field, title, month, search, includeQuestions, batch_id, batch_name } = req.query;
     const where = {};
 
     const targetField = field || title || search;
@@ -206,6 +245,20 @@ const getAllQuizzes = async (req, res) => {
 
     if (month) {
       where.month = month.trim();
+    }
+
+    if (batch_id && batch_id !== 'all') {
+      where[Op.or] = [
+        { batch_id: Number(batch_id) },
+        { batch_name: 'All Batches' },
+        { batch_id: null }
+      ];
+    } else if (batch_name && batch_name !== 'All Batches' && batch_name !== 'all') {
+      where[Op.or] = [
+        { batch_name: batch_name },
+        { batch_name: 'All Batches' },
+        { batch_name: null }
+      ];
     }
 
     const includeOptions = [];
@@ -247,6 +300,7 @@ const getAllQuizzes = async (req, res) => {
 // Get single quiz by ID (includes its questions)
 const getQuizById = async (req, res) => {
   try {
+    await ensureQuizColumns();
     const { id } = req.params;
 
     const quiz = await Quiz.findByPk(id, {
@@ -322,8 +376,9 @@ const getQuizzesByField = async (req, res) => {
 // Update quiz by ID
 const updateQuiz = async (req, res) => {
   try {
+    await ensureQuizColumns();
     const { id } = req.params;
-    const { title, field, month, total_marks } = req.body;
+    const { title, field, month, total_marks, batch_id, batch_name, class: quizClass } = req.body;
 
     const quiz = await Quiz.findByPk(id);
     if (!quiz) {
@@ -334,10 +389,23 @@ const updateQuiz = async (req, res) => {
     const updatedMonth = month !== undefined ? month : quiz.month;
     const updatedMarks = total_marks !== undefined ? total_marks : quiz.total_marks;
 
+    const resolvedBatchId = batch_id !== undefined
+      ? (batch_id && batch_id !== 'all' ? Number(batch_id) : null)
+      : quiz.batch_id;
+    const resolvedBatchName = batch_name !== undefined
+      ? (batch_name && batch_name !== 'all' ? batch_name : 'All Batches')
+      : quiz.batch_name;
+    const finalClass = quizClass !== undefined
+      ? quizClass
+      : (resolvedBatchName && resolvedBatchName !== 'All Batches' ? resolvedBatchName : quiz.class);
+
     await quiz.update({
       title: updatedTitle,
       month: updatedMonth,
-      total_marks: updatedMarks
+      total_marks: updatedMarks,
+      batch_id: resolvedBatchId,
+      batch_name: resolvedBatchName,
+      class: finalClass
     });
 
     res.status(200).json({
