@@ -18,6 +18,8 @@ router.put('/update/:id', authenticateToken, requireAdmin, questionController.up
 router.put('/:id', authenticateToken, requireAdmin, questionController.updateQuestion);
 
 // DELETE QUESTION (Admin/Tutor only)
+router.delete('/deleteByQuiz/:quizId', authenticateToken, requireAdmin, questionController.deleteQuestionsByQuizId);
+router.delete('/quiz/:quizId', authenticateToken, requireAdmin, questionController.deleteQuestionsByQuizId);
 router.delete('/deleteQuestion/:id', authenticateToken, requireAdmin, questionController.deleteQuestion);
 router.delete('/delete/:id', authenticateToken, requireAdmin, questionController.deleteQuestion);
 router.delete('/:id', authenticateToken, requireAdmin, questionController.deleteQuestion);

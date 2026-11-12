@@ -294,10 +294,47 @@ const deleteQuestion = async (req, res) => {
   }
 };
 
+// Delete all questions for a specific quiz
+const deleteQuestionsByQuizId = async (req, res) => {
+  try {
+    const rawQuizId = req.params.quizId || req.body.quiz_id;
+    const quiz_id = Number(rawQuizId);
+
+    if (!rawQuizId || !Number.isInteger(quiz_id) || quiz_id <= 0) {
+      return res.status(400).json({
+        message: 'Valid numeric quizId is required'
+      });
+    }
+
+    const quiz = await Quiz.findByPk(quiz_id);
+    if (!quiz) {
+      return res.status(404).json({
+        message: `Quiz with id ${quiz_id} not found`
+      });
+    }
+
+    const deletedCount = await Question.destroy({
+      where: { quiz_id }
+    });
+
+    res.status(200).json({
+      message: 'All questions for quiz deleted successfully',
+      deletedCount
+    });
+  } catch (error) {
+    console.error('Error in deleteQuestionsByQuizId:', error);
+    res.status(500).json({
+      message: 'Failed to delete quiz questions',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   createQuestion,
   getQuestionsByQuizId,
   getQuestionById,
   updateQuestion,
-  deleteQuestion
+  deleteQuestion,
+  deleteQuestionsByQuizId
 };
