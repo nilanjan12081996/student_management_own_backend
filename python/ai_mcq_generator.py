@@ -80,6 +80,7 @@ CRITICAL REQUIREMENTS:
 5. Include 'topic_tag' denoting the specific sub-concept tested (e.g., 'Closures', 'Index Scan', 'State Immutability').
 6. Include a thorough pedagogical 'explanation' explaining why the correct choice is true and what trap causes students to pick the wrong option.
 7. Return ONLY a valid JSON array of objects. No markdown formatting.
+8. CRITICAL QUESTION PHRASING: Formulate questions as standard university-level academic examination questions (e.g. 'Which of the following statements regarding {topic} is correct?', 'In {topic}, what is the role of...?'). NEVER write 'According to the uploaded reference material', 'According to the file', 'Based on the uploaded document', or 'In the provided text'. The student taking the exam has no knowledge of any uploaded file.
 
 Format schema:
 [
@@ -310,6 +311,136 @@ DOMAIN_KNOWLEDGE_BASE = {
             "marks": 3,
             "explanation": "In SQL three-valued logic, any comparison with NULL (e.g. !=, =) yields UNKNOWN, which evaluates to false in a WHERE clause filter."
         }
+    ],
+    "c_programming": [
+        {
+            "layer": "Concept Foundation & Syntax",
+            "topic": "Language Paradigm & Execution",
+            "question": "Which of the following statements regarding the C programming language is correct?",
+            "options": [
+                "C is a procedural, structured language supporting both high-level constructs and low-level memory operations",
+                "C is a purely object-oriented language executed inside a bytecode virtual machine",
+                "C prohibits explicit pointer arithmetic and manual memory deallocation",
+                "C requires an automatic garbage collector to reclaim dynamically allocated heap memory"
+            ],
+            "answer": "C is a procedural, structured language supporting both high-level constructs and low-level memory operations",
+            "marks": 2,
+            "explanation": "C is famously designed as a middle-level procedural language offering structured control flow alongside direct memory manipulation through pointers."
+        },
+        {
+            "layer": "Execution Dynamics & Flow",
+            "topic": "Dynamic Memory Allocation",
+            "question": "Which dynamic memory allocation function in C explicitly initializes all allocated memory bytes to zero?",
+            "options": [
+                "calloc()",
+                "malloc()",
+                "realloc()",
+                "free()"
+            ],
+            "answer": "calloc()",
+            "marks": 2,
+            "explanation": "calloc(num, size) allocates memory and clears all bits to zero, whereas malloc() leaves allocated memory uninitialized."
+        },
+        {
+            "layer": "Diagnostic Debugging & Tracing",
+            "topic": "Pointer Lifecycle & Traps",
+            "question": "In C programming, what is a 'Dangling Pointer' and why does it represent a critical hazard?",
+            "options": [
+                "A pointer referencing memory that has already been deallocated, which can cause memory corruption if accessed",
+                "A pointer initialized to NULL that safely prevents unexpected writes",
+                "A pointer to a function rather than a standard primitive data type",
+                "A void pointer that cannot be cast to any concrete struct type"
+            ],
+            "answer": "A pointer referencing memory that has already been deallocated, which can cause memory corruption if accessed",
+            "marks": 3,
+            "explanation": "When memory freed via free() continues to be accessed through an un-cleared pointer, undefined behavior occurs."
+        },
+        {
+            "layer": "Edge Cases & Trap Detection",
+            "topic": "Memory Alignment & Structures",
+            "question": "What is the fundamental difference in memory allocation between a 'struct' and a 'union' in C?",
+            "options": [
+                "A struct allocates separate memory for each member, while a union shares a single common memory space equal to its largest member",
+                "A union can only contain pointers, while a struct is limited to primitive types",
+                "A struct is placed in the data segment while a union is allocated on the heap",
+                "A union cannot be passed as a function argument"
+            ],
+            "answer": "A struct allocates separate memory for each member, while a union shares a single common memory space equal to its largest member",
+            "marks": 3,
+            "explanation": "In a union, all members share the same base memory address, meaning only one member can be meaningfully read or written at any one time."
+        }
+    ],
+    "java": [
+        {
+            "layer": "Concept Foundation & Syntax",
+            "topic": "Class & Object Blueprint",
+            "question": "In Java Object-Oriented Programming, how is an object fundamentally related to a class?",
+            "options": [
+                "A class is a blueprint defining fields and methods, while an object is a runtime instance created on the heap via new",
+                "An object is a static template used to compile multiple separate classes",
+                "A class stores runtime instance variables directly without creating any objects",
+                "An object in Java can be instantiated independently without belonging to any class"
+            ],
+            "answer": "A class is a blueprint defining fields and methods, while an object is a runtime instance created on the heap via new",
+            "marks": 2,
+            "explanation": "A class specifies the attributes and behaviors, whereas each object created with 'new' holds its own state in heap memory."
+        },
+        {
+            "layer": "Concept Foundation & Syntax",
+            "topic": "Java Constructors",
+            "question": "Which statement is TRUE regarding constructors in a Java class?",
+            "options": [
+                "A constructor must share the exact name of the class and has no explicit return type, not even void",
+                "A constructor must declare void as its return type so objects instantiate properly",
+                "Constructors are automatically inherited and overridden by subclasses",
+                "A class cannot compile unless a parameterized constructor is explicitly declared"
+            ],
+            "answer": "A constructor must share the exact name of the class and has no explicit return type, not even void",
+            "marks": 2,
+            "explanation": "Java constructors share the class name, declare no return type (adding void defines a regular method instead), and initialize object state."
+        },
+        {
+            "layer": "Execution Dynamics & Flow",
+            "topic": "Polymorphism & Dynamic Dispatch",
+            "question": "In Java inheritance, when a Child object is held in a Parent reference (Parent p = new Child();), which overridden method runs on p.show()?",
+            "options": [
+                "The Child class method executes at runtime via Dynamic Method Dispatch",
+                "The Parent class method always executes based on the reference declaration type",
+                "Both Parent and Child methods run sequentially",
+                "A compilation error occurs because Parent cannot reference Child"
+            ],
+            "answer": "The Child class method executes at runtime via Dynamic Method Dispatch",
+            "marks": 2,
+            "explanation": "Overridden instance methods in Java are dispatched dynamically at runtime according to the actual object's class on the heap."
+        },
+        {
+            "layer": "Diagnostic Debugging & Tracing",
+            "topic": "Static Context Rules",
+            "question": "What restriction applies inside a static method in a Java class?",
+            "options": [
+                "It belongs to the class itself and cannot directly access non-static instance fields or use the 'this' keyword",
+                "It can only execute after at least one instance is created with new",
+                "All local variables declared inside a static method become immutable constants",
+                "It automatically turns private and invisible to other classes in the same package"
+            ],
+            "answer": "It belongs to the class itself and cannot directly access non-static instance fields or use the 'this' keyword",
+            "marks": 3,
+            "explanation": "Static methods are not bound to any object instance, so they cannot reference 'this' or access instance fields without an object reference."
+        },
+        {
+            "layer": "Concept Foundation & Syntax",
+            "topic": "Encapsulation & Access Control",
+            "question": "How does Encapsulation protect instance state in a Java class?",
+            "options": [
+                "By declaring fields private and exposing validated access through public getter and setter methods",
+                "By declaring all attributes as public static final constants",
+                "By storing all object state in local variables inside main()",
+                "By marking every class final so no subclasses can declare methods"
+            ],
+            "answer": "By declaring fields private and exposing validated access through public getter and setter methods",
+            "marks": 2,
+            "explanation": "Encapsulation hides internal fields behind private visibility and controls reads/writes through public methods."
+        }
     ]
 }
 
@@ -326,7 +457,11 @@ def generate_mcqs_fallback(
 
     # Find matched domain
     matched_domain = None
-    if any(k in clean_topic for k in ["javascript", "js", "node", "express", "async", "promise", "es6"]):
+    if any(k in clean_topic for k in ["java", "jvm", "jdk", "class and object", "classes and objects", "oop", "object oriented", "object-oriented", "inheritance", "polymorphism", "encapsulation", "constructor", "icse"]):
+        matched_domain = "java"
+    elif clean_topic == "c" or any(k in clean_topic for k in ["c programming", "c language", "pointer", "malloc", "struct", "btech sem1"]):
+        matched_domain = "c_programming"
+    elif any(k in clean_topic for k in ["javascript", "js", "node", "express", "async", "promise", "es6"]):
         matched_domain = "javascript"
     elif any(k in clean_topic for k in ["react", "component", "hook", "frontend", "state", "redux"]):
         matched_domain = "react"

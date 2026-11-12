@@ -1,5 +1,28 @@
 const { Question, Quiz } = require('../../models');
 
+let questionColumnsEnsured = false;
+const ensureQuestionColumns = async () => {
+  if (questionColumnsEnsured) return;
+  try {
+    const sequelize = Question.sequelize;
+    const alterQueries = [
+      "ALTER TABLE Questions MODIFY COLUMN correct_answer TEXT NOT NULL",
+      "ALTER TABLE questions MODIFY COLUMN correct_answer TEXT NOT NULL",
+      "ALTER TABLE Questions ADD COLUMN organization_id INT NOT NULL DEFAULT 1",
+      "ALTER TABLE questions ADD COLUMN organization_id INT NOT NULL DEFAULT 1"
+    ];
+    for (const sql of alterQueries) {
+      try {
+        await sequelize.query(sql);
+      } catch (_) {}
+    }
+    questionColumnsEnsured = true;
+  } catch (err) {
+    console.warn('ensureQuestionColumns note:', err.message);
+    questionColumnsEnsured = true;
+  }
+};
+
 // Helper to normalize options
 const formatOptions = (options) => {
   if (!options) return options;
@@ -16,7 +39,9 @@ const formatOptions = (options) => {
 // Create a new question for a quiz
 const createQuestion = async (req, res) => {
   try {
-    const quiz_id = req.params.quizId || req.body.quiz_id;
+    await ensureQuestionColumns();
+    const rawQuizId = req.params.quizId || req.body.quiz_id;
+    const quiz_id = Number(rawQuizId);
     const {
       question_text,
       question,
@@ -24,15 +49,16 @@ const createQuestion = async (req, res) => {
       correct_answer,
       answer,
       marks,
-      explanation
+      explanation,
+      organization_id
     } = req.body;
 
-    const resolvedText = question_text || question;
-    const resolvedAnswer = correct_answer || answer;
+    const resolvedText = (question_text || question || '').trim();
+    const resolvedAnswer = String(correct_answer || answer || '').trim();
 
-    if (!quiz_id) {
+    if (!rawQuizId || !Number.isInteger(quiz_id) || quiz_id <= 0) {
       return res.status(400).json({
-        message: 'quiz_id is required'
+        message: 'Valid numeric quiz_id is required'
       });
     }
 
@@ -56,16 +82,24 @@ const createQuestion = async (req, res) => {
       });
     }
 
-    const formattedOptions = options
+    const resolvedOrganizationId =
+      Number(organization_id || quiz.organization_id || req.user?.organization_id || 1) || 1;
+    const parsedMarks =
+      marks !== undefined && marks !== null && String(marks).trim() !== '' && Number.isFinite(Number(marks))
+        ? parseInt(marks, 10)
+        : 1;
+
+    const formattedOptions = options !== undefined && options !== null
       ? (typeof options === 'object' ? JSON.stringify(options) : options)
       : null;
 
     const newQuestion = await Question.create({
+      organization_id: resolvedOrganizationId,
       quiz_id,
       question_text: resolvedText,
       options: formattedOptions,
       correct_answer: resolvedAnswer,
-      marks: marks !== undefined ? marks : 1,
+      marks: parsedMarks,
       explanation: explanation || null
     });
 
@@ -198,9 +232,11 @@ const updateQuestion = async (req, res) => {
 
     const resolvedText = question_text !== undefined ? question_text : (question !== undefined ? question : existingQuestion.question_text);
     const resolvedAnswer = correct_answer !== undefined ? correct_answer : (answer !== undefined ? answer : existingQuestion.correct_answer);
-    const resolvedMarks = marks !== undefined ? marks : existingQuestion.marks;
+    const resolvedMarks = marks !== undefined && String(marks).trim() !== '' && Number.isFinite(Number(marks))
+      ? parseInt(marks, 10)
+      : existingQuestion.marks;
     const resolvedExplanation = explanation !== undefined ? explanation : existingQuestion.explanation;
-    const resolvedQuizId = quiz_id !== undefined ? quiz_id : existingQuestion.quiz_id;
+    const resolvedQuizId = quiz_id !== undefined ? Number(quiz_id) : existingQuestion.quiz_id;
 
     let formattedOptions = existingQuestion.options;
     if (options !== undefined) {

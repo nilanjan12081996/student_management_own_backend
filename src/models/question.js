@@ -37,7 +37,7 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true
     },
     correct_answer: {
-      type: DataTypes.STRING,
+      type: DataTypes.TEXT,
       allowNull: false
     },
     marks: {

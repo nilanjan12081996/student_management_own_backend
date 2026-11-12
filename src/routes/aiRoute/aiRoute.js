@@ -20,7 +20,10 @@ function extractTextFromPdfBase64(base64Data) {
 
     const streamRegex = /stream[\r\n]+([\s\S]*?)[\r\n]+endstream/g;
     let match;
-    while ((match = streamRegex.exec(content)) !== null) {
+    let streamCount = 0;
+    while ((match = streamRegex.exec(content)) !== null && streamCount < 350 && extracted.length < 45000) {
+      streamCount++;
+      if (!match[1] || match[1].length > 150000) continue;
       let streamData = Buffer.from(match[1], 'binary');
       try {
         streamData = zlib.inflateSync(streamData);
@@ -44,9 +47,10 @@ function extractTextFromPdfBase64(base64Data) {
     }
 
     extracted = extracted
-      .replace(/\\([()])/g, '$1')
-      .replace(/\\r|\\n/g, ' ')
-      .replace(/\s+/g, ' ')
+      .replace(/\\([()\\])/g, '$1')
+      .replace(/\\r|\\n|\\t/g, ' ')
+      .replace(/[^\x20-\x7E\r\n]/g, ' ')
+      .replace(/[ \t]+/g, ' ')
       .trim();
 
     return extracted;
@@ -178,7 +182,7 @@ function synthesizeMcqsFromReference(referenceText, topic, count = 5, difficulty
     let distractors = [];
 
     if (fact.type === 'definition' || fact.type === 'purpose') {
-      qText = `According to the reference document, which statement accurately describes "${fact.subject}"?`;
+      qText = `Which statement accurately describes "${fact.subject}" in ${topic}?`;
       correct = `${fact.subject} ${fact.predicate.endsWith('.') ? fact.predicate.slice(0, -1) : fact.predicate}`;
       distractors = [
         `${fact.subject} strictly bypasses validation rules and operates without state boundaries`,
@@ -186,7 +190,7 @@ function synthesizeMcqsFromReference(referenceText, topic, count = 5, difficulty
         `${fact.subject} executes exclusively during compile-time without runtime persistence`
       ];
     } else if (fact.type === 'composition') {
-      qText = `Based on the provided study material, what primarily constitutes or defines "${fact.subject}"?`;
+      qText = `In ${topic}, what primarily characterizes or defines "${fact.subject}"?`;
       correct = `${fact.predicate}`;
       distractors = [
         `Static immutable strings without structural elements`,
@@ -194,7 +198,7 @@ function synthesizeMcqsFromReference(referenceText, topic, count = 5, difficulty
         `Arbitrary external plugins decoupled from the primary architecture`
       ];
     } else {
-      qText = `In the context of ${topic || 'the study material'}, what is the significance of "${fact.subject}"?`;
+      qText = `In the context of ${topic || 'Computer Science'}, what is the primary significance of "${fact.subject}"?`;
       correct = `${fact.predicate}`;
       distractors = [
         `It limits scalability and introduces non-deterministic thread contention`,
@@ -212,22 +216,29 @@ function synthesizeMcqsFromReference(referenceText, topic, count = 5, difficulty
       marks: 2,
       cognitive_layer: layer,
       topic_tag: fact.subject.slice(0, 30),
-      explanation: `Reference Excerpt: "${fact.sentence.slice(0, 180)}..." This confirms the verified principle.`
+      explanation: `Core Concept: "${fact.sentence.slice(0, 180)}..." Distractors present conflicting or erroneous assertions.`
     });
   }
 
   // 2. Formulate additional questions from prominent sentences if needed
   let sIdx = 0;
+  const generalPhrasings = [
+    `Which of the following statements regarding ${topic} is correct?`,
+    `In the context of ${topic}, which of the following statements is TRUE?`,
+    `Regarding ${topic}, which statement correctly highlights its key characteristics?`,
+    `Which of the following is a verified technical principle in ${topic}?`
+  ];
+
   while (questions.length < count && sIdx < sentences.length) {
     const s = sentences[sIdx++];
     const layer = cognitiveLayers[questions.length % cognitiveLayers.length];
 
-    const qText = `Based on the uploaded reference document, which of the following statements is TRUE?`;
+    const qText = generalPhrasings[questions.length % generalPhrasings.length];
     const correct = s.length > 120 ? s.slice(0, 117) + '...' : s;
     const distractors = [
-      `The document asserts that automated validations are redundant and should be omitted`,
-      `The document advises using arbitrary hardcoded values rather than dynamic state`,
-      `The architecture described is limited to single-threaded offline execution only`
+      `It strictly prohibits structured abstractions and eliminates compile-time validation`,
+      `It forces all unrelated runtime logic into a single global unvalidated script`,
+      `The architecture described is limited to single-threaded offline execution without state isolation`
     ];
 
     const options = [correct, ...distractors].sort(() => 0.5 - Math.random());
@@ -239,73 +250,20 @@ function synthesizeMcqsFromReference(referenceText, topic, count = 5, difficulty
       marks: 2,
       cognitive_layer: layer,
       topic_tag: topic || 'Core Concept',
-      explanation: `Direct from uploaded study material: "${s.slice(0, 160)}..."`
+      explanation: `Core Principle: "${s.slice(0, 160)}..." Distractors represent conflicting models or incorrect constraints.`
     });
   }
 
-  // 3. Fallback when text is too short or empty
-  if (questions.length === 0) {
-    const safeTopic = topic || 'Computer Science & Software Architecture';
-    const templates = [
-      {
-        q: `What is the primary function of ${safeTopic} in scalable systems?`,
-        c: `To structure and govern system interactions with deterministic state and error boundaries`,
-        d: [
-          `To bypass memory constraints by hardcoding unbounded memory limits`,
-          `To eliminate the need for schema validation or testing`,
-          `To force all execution into a single synchronous thread`
-        ],
-        layer: 'Concept Foundation & Syntax',
-        exp: `In ${safeTopic}, maintaining deterministic state boundaries and structured interfaces is essential.`
-      },
-      {
-        q: `When evaluating execution dynamics in ${safeTopic}, how should asynchronous operations be managed?`,
-        c: `Through explicit promises or event coordination with non-blocking execution`,
-        d: [
-          `By blocking CPU threads until network latency resolves`,
-          `By discarding unhandled rejections without error logging`,
-          `By executing microtasks after browser window destruction`
-        ],
-        layer: 'Execution Dynamics & Flow',
-        exp: `Non-blocking asynchronous control ensures responsive throughput and predictability in ${safeTopic}.`
-      },
-      {
-        q: `During diagnostic debugging of ${safeTopic}, what is the first step when isolating an intermittent failure?`,
-        c: `Examine state transition logs and recreate boundary conditions deterministically`,
-        d: [
-          `Delete unit tests that fail to make the build pass`,
-          `Restart the host server repeatedly without inspecting stack traces`,
-          `Disable defensive assertion checks in production`
-        ],
-        layer: 'Diagnostic Debugging & Tracing',
-        exp: `Deterministic boundary recreation and tracing logs are the foundational steps in isolating defects.`
-      },
-      {
-        q: `Which edge-case trap is most commonly overlooked when implementing ${safeTopic}?`,
-        c: `Handling zero-state, null dereferencing, and network timeout latency boundaries`,
-        d: [
-          `Setting code formatting indentation rules to 2 spaces instead of 4`,
-          `Running without auxiliary browser extensions`,
-          `Using standard UTF-8 text encoding`
-        ],
-        layer: 'Edge Cases & Trap Detection',
-        exp: `Robust systems must rigorously guard against boundary zero-states, null values, and network timeouts.`
-      }
-    ];
-
-    for (let i = 0; i < count; i++) {
-      const t = templates[i % templates.length];
-      const options = [t.c, ...t.d].sort(() => 0.5 - Math.random());
-      questions.push({
-        question_text: t.q,
-        options,
-        correct_answer: t.c,
-        marks: 2,
-        cognitive_layer: t.layer,
-        topic_tag: safeTopic,
-        explanation: t.exp
-      });
-    }
+  // 3. Fallback when text is too short or empty: delegate to domain-aware curriculum synthesizer
+  if (questions.length < count) {
+    const extra = generateSmartQuestions({
+      topic: topic || 'Computer Science',
+      referenceText: text,
+      count: count - questions.length,
+      difficulty,
+      cognitiveLayer
+    });
+    questions.push(...extra);
   }
 
   return questions.slice(0, count);
@@ -432,6 +390,7 @@ REQUIREMENTS:
 5. Set 'marks' (e.g. 2).
 6. Set 'explanation' providing clear pedagogical reasoning.
 7. Return ONLY a valid JSON array of objects. No markdown formatting.
+8. CRITICAL QUESTION PHRASING: Formulate questions as standard university-level academic examination questions (e.g. 'Which of the following statements regarding ${topic} is correct?', 'In ${topic}, what is the role of...?'). NEVER write 'According to the uploaded reference material', 'According to the file', 'Based on the uploaded document', or 'In the provided text'. The student taking the exam has no knowledge of any uploaded file.
 
 Format schema:
 [
@@ -474,8 +433,9 @@ Format schema:
     } catch (_) {}
 
     // Attempt 3: Pure Node.js Academic Curriculum & Reference-Based Synthesizer (Zero-Failure)
+    const fallbackTopic = (topic || '').trim() || (file_name ? file_name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ') : 'Computer Science');
     const questions = generateSmartQuestions({
-      topic,
+      topic: fallbackTopic,
       referenceText: effectiveReferenceText,
       count: parsedCount,
       difficulty,
