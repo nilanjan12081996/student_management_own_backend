@@ -95,12 +95,19 @@ Format schema:
   }}
 ]
 """
-        response = client.models.generate_content(
-            model="gemini-1.5-flash",
-            contents=prompt
-        )
+        response = None
+        for model_name in ("gemini-2.5-flash", "gemini-2.0-flash"):
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt
+                )
+                if response and getattr(response, "text", None):
+                    break
+            except Exception:
+                continue
 
-        raw_text = response.text
+        raw_text = response.text if response else None
         if not raw_text:
             return None
 

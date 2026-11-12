@@ -63,70 +63,103 @@ function extractTextFromPdfBase64(base64Data) {
 // =====================================================================
 // 2. GOOGLE GEMINI MULTIMODAL API CALLER (REST)
 // =====================================================================
-async function callGeminiApi(prompt, fileBase64 = null, customKey = null) {
-  const apiKey = customKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-  if (!apiKey) return null;
+const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash'];
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+async function callGeminiApi(prompt, fileBase64 = null, customKey = null, options = {}) {
+  const apiKey = (customKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
+  if (!apiKey) return { data: null, model: null, error: 'GEMINI_API_KEY is not configured' };
+
+  const { expectJson = true, maxOutputTokens = 8192, temperature = 0.35, timeoutMs = 50000 } = options;
 
   const parts = [];
-
-  // Add inline PDF data if provided
-  if (fileBase64) {
-    const cleanBase64 = fileBase64.replace(/^data:[^;]+;base64,/, '');
-    parts.push({
-      inline_data: {
-        mime_type: 'application/pdf',
-        data: cleanBase64
-      }
-    });
+  if (fileBase64 && typeof fileBase64 === 'string') {
+    const mimeMatch = fileBase64.match(/^data:([^;]+);base64,/);
+    const mimeType = mimeMatch ? mimeMatch[1] : 'application/pdf';
+    const cleanBase64 = fileBase64.replace(/^data:[^;]+;base64,/, '').trim();
+    if (cleanBase64 && (mimeType === 'application/pdf' || mimeType.startsWith('text/') || mimeType.startsWith('image/'))) {
+      parts.push({
+        inline_data: {
+          mime_type: mimeType,
+          data: cleanBase64
+        }
+      });
+    }
   }
-
   parts.push({ text: prompt });
 
-  const requestBody = {
-    contents: [{ role: 'user', parts }],
-    generationConfig: {
-      temperature: 0.35,
-      topK: 40,
-      topP: 0.95
-    }
+  const generationConfig = {
+    temperature,
+    topK: 40,
+    topP: 0.95,
+    maxOutputTokens
   };
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(requestBody),
-    signal: AbortSignal.timeout(20000)
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.warn('Gemini REST API error:', response.status, errorText);
-    return null;
+  if (expectJson) {
+    generationConfig.responseMimeType = 'application/json';
   }
 
-  const jsonRes = await response.json();
-  const rawText = jsonRes?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!rawText) return null;
+  let lastError = 'Unknown Gemini API error';
 
-  // Clean Markdown JSON block
-  const cleaned = rawText
-    .replace(/```(?:json)?\s*/gi, '')
-    .replace(/```/g, '')
-    .trim();
+  for (const model of GEMINI_MODELS) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts }],
+          generationConfig
+        }),
+        signal: AbortSignal.timeout(timeoutMs)
+      });
 
-  try {
-    const parsed = JSON.parse(cleaned);
-    return parsed;
-  } catch (parseErr) {
-    // Attempt to extract JSON array
-    const arrayMatch = cleaned.match(/\[\s*\{[\s\S]*\}\s*\]/);
-    if (arrayMatch) {
-      return JSON.parse(arrayMatch[0]);
+      if (!response.ok) {
+        const errorText = await response.text();
+        let parsedErr = errorText;
+        try {
+          const errJson = JSON.parse(errorText);
+          parsedErr = errJson?.error?.message || errorText;
+        } catch (_) {}
+        lastError = `HTTP ${response.status}: ${parsedErr}`;
+        console.warn(`Gemini (${model}) REST error:`, response.status, parsedErr);
+        // Stop retrying other models if key itself is invalid or permission denied
+        if (response.status === 400 || response.status === 401 || response.status === 403) {
+          break;
+        }
+        continue;
+      }
+
+      const jsonRes = await response.json();
+      const rawText = jsonRes?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!rawText) {
+        lastError = `Empty response from ${model}`;
+        continue;
+      }
+
+      if (!expectJson) {
+        return { data: rawText.trim(), model, error: null };
+      }
+
+      const cleaned = rawText
+        .replace(/```(?:json)?\s*/gi, '')
+        .replace(/```/g, '')
+        .trim();
+
+      try {
+        return { data: JSON.parse(cleaned), model, error: null };
+      } catch (parseErr) {
+        const arrayMatch = cleaned.match(/\[\s*\{[\s\S]*\}\s*\]/);
+        if (arrayMatch) {
+          return { data: JSON.parse(arrayMatch[0]), model, error: null };
+        }
+        lastError = `Invalid JSON returned by ${model}`;
+      }
+    } catch (err) {
+      lastError = err.message || 'Network/timeout reaching Gemini API';
+      console.warn(`Gemini (${model}) call warning:`, lastError);
     }
-    throw parseErr;
   }
+
+  return { data: null, model: null, error: lastError };
 }
 
 // =====================================================================
@@ -320,8 +353,9 @@ router.get('/health', authenticateToken, requireAdmin, async (req, res) => {
     const hasGemini = Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY);
     return res.status(200).json({
       status: 'UP',
-      mode: hasGemini ? 'Google Gemini 1.5 Flash AI' : 'Contextual Reference Knowledge Engine',
+      mode: hasGemini ? 'Google Gemini 2.5 Flash AI' : 'Fallback Knowledge Engine (Add Gemini Key)',
       has_gemini: hasGemini,
+      model: 'gemini-2.5-flash',
       pdf_support: true,
       reference_generation: true,
       layers: [
@@ -331,6 +365,28 @@ router.get('/health', authenticateToken, requireAdmin, async (req, res) => {
         'Layer 4: Edge Cases & Trap Detection'
       ]
     });
+  }
+});
+
+// POST /api/ai/verify-gemini
+router.post('/verify-gemini', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const keyToTest = (req.body?.gemini_api_key || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
+    if (!keyToTest) {
+      return res.status(400).json({ valid: false, error: 'Please enter a Google Gemini API key.' });
+    }
+    const result = await callGeminiApi('Reply with the single word OK.', null, keyToTest, {
+      expectJson: false,
+      maxOutputTokens: 16,
+      temperature: 0,
+      timeoutMs: 12000
+    });
+    if (result.data) {
+      return res.status(200).json({ valid: true, model: result.model });
+    }
+    return res.status(400).json({ valid: false, error: result.error || 'Gemini API key verification failed.' });
+  } catch (err) {
+    return res.status(500).json({ valid: false, error: err.message });
   }
 });
 
@@ -357,7 +413,7 @@ router.post('/generate-mcqs', authenticateToken, requireAdmin, async (req, res) 
     if (
       effectiveReferenceText.startsWith('[Document attached:') ||
       effectiveReferenceText.includes('Ready for AI reference parsing') ||
-      effectiveReferenceText.length < 35
+      effectiveReferenceText.length < 3
     ) {
       effectiveReferenceText = '';
     }
@@ -406,22 +462,56 @@ Format schema:
 ]
 `;
 
-    try {
-      const geminiResult = await callGeminiApi(geminiPrompt, file_base64 || null, gemini_api_key || null);
-      if (Array.isArray(geminiResult) && geminiResult.length > 0) {
-        const validated = geminiResult.filter(q => q.question_text && Array.isArray(q.options) && q.correct_answer);
-        if (validated.length > 0) {
-          return res.json({
-            success: true,
-            questions: validated.slice(0, parsedCount),
-            count: validated.length,
-            engine: 'Gemini 1.5 Flash (Direct API)',
-            source: effectiveReferenceText || file_base64 ? 'Uploaded Reference Document' : 'Curriculum Synthesis'
-          });
+    const activeGeminiKey = (gemini_api_key || req.headers['x-gemini-api-key'] || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
+    let geminiError = null;
+
+    if (activeGeminiKey) {
+      try {
+        const geminiResult = await callGeminiApi(geminiPrompt, file_base64 || null, activeGeminiKey, {
+          expectJson: true,
+          maxOutputTokens: 8192,
+          temperature: 0.35,
+          timeoutMs: 50000
+        });
+
+        if (Array.isArray(geminiResult.data) && geminiResult.data.length > 0) {
+          const validated = geminiResult.data
+            .filter(q => q && q.question_text && Array.isArray(q.options) && q.options.length >= 2 && q.correct_answer)
+            .map((q, idx) => {
+              const opts = q.options.slice(0, 4).map(o => String(o).trim());
+              const rawAns = String(q.correct_answer).trim();
+              const matchedOpt = opts.find(o => o === rawAns || o.toLowerCase() === rawAns.toLowerCase()) || opts[0];
+              return {
+                question_text: String(q.question_text).trim(),
+                options: opts,
+                correct_answer: matchedOpt,
+                marks: Number(q.marks) || 2,
+                cognitive_layer: q.cognitive_layer || [
+                  'Concept Foundation & Syntax',
+                  'Execution Dynamics & Flow',
+                  'Diagnostic Debugging & Tracing',
+                  'Edge Cases & Trap Detection'
+                ][idx % 4],
+                topic_tag: q.topic_tag || topic,
+                explanation: q.explanation || `Core concept in ${topic}.`
+              };
+            });
+
+          if (validated.length > 0) {
+            return res.json({
+              success: true,
+              questions: validated.slice(0, parsedCount),
+              count: Math.min(validated.length, parsedCount),
+              engine: `Google Gemini AI (${geminiResult.model || 'gemini-2.5-flash'})`,
+              source: effectiveReferenceText || file_base64 ? `Gemini Multimodal (${file_name || 'Uploaded Reference'})` : 'Google Gemini AI'
+            });
+          }
         }
+        geminiError = geminiResult.error || 'Gemini returned no valid MCQs.';
+      } catch (geminiErr) {
+        geminiError = geminiErr.message;
+        console.warn('Direct Gemini call failed:', geminiErr.message);
       }
-    } catch (geminiErr) {
-      console.warn('Direct Gemini call failed or key absent:', geminiErr.message);
     }
 
     // Attempt 2: Forward to Python microservice if running
@@ -447,6 +537,7 @@ Format schema:
       questions,
       count: questions.length,
       engine: 'Academic Curriculum Knowledge Engine',
+      gemini_error: geminiError,
       source: effectiveReferenceText ? `Reference Document (${file_name || 'Uploaded Text'})` : 'Academic Curriculum Knowledge Base'
     });
 
@@ -462,7 +553,7 @@ Format schema:
 // POST /api/ai/generate-notes
 router.post('/generate-notes', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { topic = 'General Topic', subject = 'Computer Science', style = 'Detailed Guide', reference_text = '' } = req.body;
+    const { topic = 'General Topic', subject = 'Computer Science', style = 'Detailed Guide', reference_text = '', gemini_api_key = '' } = req.body;
 
     const geminiPrompt = `
 You are an elite academic professor. Generate a comprehensive, pedagogical study note on:
@@ -480,9 +571,9 @@ Include:
 `;
 
     try {
-      const geminiNote = await callGeminiApi(geminiPrompt);
-      if (typeof geminiNote === 'string' && geminiNote.length > 100) {
-        return res.json({ success: true, note: geminiNote });
+      const geminiNote = await callGeminiApi(geminiPrompt, null, gemini_api_key || null, { expectJson: false });
+      if (typeof geminiNote?.data === 'string' && geminiNote.data.length > 100) {
+        return res.json({ success: true, note: geminiNote.data, engine: `Google Gemini AI (${geminiNote.model})` });
       }
     } catch (_) {}
 
