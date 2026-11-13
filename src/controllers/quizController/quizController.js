@@ -26,10 +26,12 @@ const ensureQuizColumns = async () => {
       "ALTER TABLE Quizzes ADD COLUMN batch_ids VARCHAR(255) NULL",
       "ALTER TABLE Quizzes ADD COLUMN batch_name VARCHAR(255) NULL",
       "ALTER TABLE Quizzes ADD COLUMN class VARCHAR(255) NULL",
+      "ALTER TABLE Quizzes ADD COLUMN is_published TINYINT(1) DEFAULT 0",
       "ALTER TABLE quizzes ADD COLUMN batch_id INT NULL",
       "ALTER TABLE quizzes ADD COLUMN batch_ids VARCHAR(255) NULL",
       "ALTER TABLE quizzes ADD COLUMN batch_name VARCHAR(255) NULL",
-      "ALTER TABLE quizzes ADD COLUMN class VARCHAR(255) NULL"
+      "ALTER TABLE quizzes ADD COLUMN class VARCHAR(255) NULL",
+      "ALTER TABLE quizzes ADD COLUMN is_published TINYINT(1) DEFAULT 0"
     ];
     for (const sql of alterQueries) {
       try {
@@ -169,7 +171,7 @@ function generateLocalAnalysis(studentName, quizTitle, score, totalMarks, wrongQ
 const createQuiz = async (req, res) => {
   try {
     await ensureQuizColumns();
-    const { title, field, month, total_marks, questions, organization_id, batch_id, batch_ids, batch_name, class: quizClass } = req.body;
+    const { title, field, month, total_marks, questions, organization_id, batch_id, batch_ids, batch_name, class: quizClass, is_published } = req.body;
     const quizTitle = title || field;
 
     if (!quizTitle) {
@@ -191,6 +193,9 @@ const createQuiz = async (req, res) => {
     const finalClass = (resolvedBatchName && resolvedBatchName !== 'All Batches')
       ? resolvedBatchName
       : (quizClass || 'All Classes');
+    const resolvedIsPublished = is_published !== undefined
+      ? Boolean(is_published)
+      : !!(resolvedBatchIds || (resolvedBatchName && resolvedBatchName !== 'All Batches' && !resolvedBatchName.toLowerCase().includes('draft')));
 
     const quiz = await Quiz.create({
       organization_id: organization_id || 1,
@@ -200,7 +205,8 @@ const createQuiz = async (req, res) => {
       batch_id: resolvedBatchId,
       batch_ids: resolvedBatchIds,
       batch_name: resolvedBatchName,
-      class: finalClass
+      class: finalClass,
+      is_published: resolvedIsPublished
     });
 
     let createdQuestions = [];
@@ -386,7 +392,7 @@ const updateQuiz = async (req, res) => {
   try {
     await ensureQuizColumns();
     const { id } = req.params;
-    const { title, field, month, total_marks, batch_id, batch_ids, batch_name, class: quizClass } = req.body;
+    const { title, field, month, total_marks, batch_id, batch_ids, batch_name, class: quizClass, is_published } = req.body;
 
     const quiz = await Quiz.findByPk(id);
     if (!quiz) {
@@ -409,6 +415,9 @@ const updateQuiz = async (req, res) => {
     const finalClass = quizClass !== undefined
       ? quizClass
       : (resolvedBatchName && resolvedBatchName !== 'All Batches' ? resolvedBatchName : quiz.class);
+    const resolvedIsPublished = is_published !== undefined
+      ? Boolean(is_published)
+      : (batch_ids !== undefined || batch_name !== undefined ? true : (quiz.is_published || false));
 
     await quiz.update({
       title: updatedTitle,
@@ -417,7 +426,8 @@ const updateQuiz = async (req, res) => {
       batch_id: resolvedBatchId,
       batch_ids: resolvedBatchIds,
       batch_name: resolvedBatchName,
-      class: finalClass
+      class: finalClass,
+      is_published: resolvedIsPublished
     });
 
     res.status(200).json({
