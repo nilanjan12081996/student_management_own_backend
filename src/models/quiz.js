@@ -29,6 +29,7 @@ module.exports = (sequelize, DataTypes) => {
     month: DataTypes.STRING,
     total_marks: DataTypes.INTEGER,
     batch_id: DataTypes.INTEGER,
+    batch_ids: DataTypes.STRING,
     batch_name: DataTypes.STRING,
     class: DataTypes.STRING
   }, {

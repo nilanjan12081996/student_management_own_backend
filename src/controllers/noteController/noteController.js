@@ -7,8 +7,10 @@ const ensureNoteColumns = async () => {
         const sequelize = Note.sequelize;
         const alterQueries = [
             "ALTER TABLE Notes ADD COLUMN batch_id INT NULL",
+            "ALTER TABLE Notes ADD COLUMN batch_ids VARCHAR(255) NULL",
             "ALTER TABLE Notes ADD COLUMN batch_name VARCHAR(255) NULL",
             "ALTER TABLE notes ADD COLUMN batch_id INT NULL",
+            "ALTER TABLE notes ADD COLUMN batch_ids VARCHAR(255) NULL",
             "ALTER TABLE notes ADD COLUMN batch_name VARCHAR(255) NULL"
         ];
         for (const sql of alterQueries) {
@@ -45,11 +47,15 @@ const createNote = async (req, res) => {
             content_type,
             content_url,
             batch_id,
+            batch_ids,
             batch_name,
             organization_id
         } = req.body;
 
         const resolvedBatchId = batch_id && batch_id !== 'all' ? Number(batch_id) : null;
+        const resolvedBatchIds = batch_ids
+            ? (Array.isArray(batch_ids) ? batch_ids.join(',') : String(batch_ids))
+            : null;
         const resolvedBatchName = batch_name && batch_name !== 'All Batches' && batch_name !== 'all'
             ? batch_name
             : (resolvedBatchId ? null : 'All Batches');
@@ -67,6 +73,7 @@ const createNote = async (req, res) => {
             class: finalClass,
             semester: resolvedSemester,
             batch_id: resolvedBatchId,
+            batch_ids: resolvedBatchIds,
             batch_name: resolvedBatchName,
             content_type,
             content_url,
@@ -191,12 +198,16 @@ const updateNote = async (req, res) => {
             content_type,
             content_url,
             batch_id,
+            batch_ids,
             batch_name
         } = req.body;
 
         const resolvedBatchId = batch_id !== undefined
             ? (batch_id && batch_id !== 'all' ? Number(batch_id) : null)
             : note.batch_id;
+        const resolvedBatchIds = batch_ids !== undefined
+            ? (Array.isArray(batch_ids) ? batch_ids.join(',') : (batch_ids ? String(batch_ids) : null))
+            : note.batch_ids;
         const resolvedBatchName = batch_name !== undefined
             ? (batch_name && batch_name !== 'All Batches' && batch_name !== 'all' ? batch_name : (resolvedBatchId ? null : 'All Batches'))
             : note.batch_name;
@@ -215,6 +226,7 @@ const updateNote = async (req, res) => {
             class: finalClass,
             semester: resolvedSemester,
             batch_id: resolvedBatchId,
+            batch_ids: resolvedBatchIds,
             batch_name: resolvedBatchName,
             content_type: content_type !== undefined ? content_type : note.content_type,
             content_url: content_url !== undefined ? content_url : note.content_url

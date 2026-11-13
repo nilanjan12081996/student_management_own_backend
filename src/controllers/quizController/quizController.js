@@ -23,9 +23,11 @@ const ensureQuizColumns = async () => {
     const sequelize = Quiz.sequelize;
     const alterQueries = [
       "ALTER TABLE Quizzes ADD COLUMN batch_id INT NULL",
+      "ALTER TABLE Quizzes ADD COLUMN batch_ids VARCHAR(255) NULL",
       "ALTER TABLE Quizzes ADD COLUMN batch_name VARCHAR(255) NULL",
       "ALTER TABLE Quizzes ADD COLUMN class VARCHAR(255) NULL",
       "ALTER TABLE quizzes ADD COLUMN batch_id INT NULL",
+      "ALTER TABLE quizzes ADD COLUMN batch_ids VARCHAR(255) NULL",
       "ALTER TABLE quizzes ADD COLUMN batch_name VARCHAR(255) NULL",
       "ALTER TABLE quizzes ADD COLUMN class VARCHAR(255) NULL"
     ];
@@ -167,7 +169,7 @@ function generateLocalAnalysis(studentName, quizTitle, score, totalMarks, wrongQ
 const createQuiz = async (req, res) => {
   try {
     await ensureQuizColumns();
-    const { title, field, month, total_marks, questions, organization_id, batch_id, batch_name, class: quizClass } = req.body;
+    const { title, field, month, total_marks, questions, organization_id, batch_id, batch_ids, batch_name, class: quizClass } = req.body;
     const quizTitle = title || field;
 
     if (!quizTitle) {
@@ -180,6 +182,9 @@ const createQuiz = async (req, res) => {
     }
 
     const resolvedBatchId = batch_id && batch_id !== 'all' ? Number(batch_id) : null;
+    const resolvedBatchIds = batch_ids
+      ? (Array.isArray(batch_ids) ? batch_ids.join(',') : String(batch_ids))
+      : null;
     const resolvedBatchName = batch_name && batch_name !== 'All Batches' && batch_name !== 'all'
       ? batch_name
       : (resolvedBatchId ? null : 'All Batches');
@@ -193,6 +198,7 @@ const createQuiz = async (req, res) => {
       month: month || 'Unassigned',
       total_marks: computedTotalMarks !== undefined ? computedTotalMarks : 0,
       batch_id: resolvedBatchId,
+      batch_ids: resolvedBatchIds,
       batch_name: resolvedBatchName,
       class: finalClass
     });
@@ -250,12 +256,14 @@ const getAllQuizzes = async (req, res) => {
     if (batch_id && batch_id !== 'all') {
       where[Op.or] = [
         { batch_id: Number(batch_id) },
+        { batch_ids: { [Op.like]: `%${batch_id}%` } },
+        { batch_name: { [Op.like]: `%${batch_name || ''}%` } },
         { batch_name: 'All Batches' },
         { batch_id: null }
       ];
     } else if (batch_name && batch_name !== 'All Batches' && batch_name !== 'all') {
       where[Op.or] = [
-        { batch_name: batch_name },
+        { batch_name: { [Op.like]: `%${batch_name}%` } },
         { batch_name: 'All Batches' },
         { batch_name: null }
       ];
@@ -378,7 +386,7 @@ const updateQuiz = async (req, res) => {
   try {
     await ensureQuizColumns();
     const { id } = req.params;
-    const { title, field, month, total_marks, batch_id, batch_name, class: quizClass } = req.body;
+    const { title, field, month, total_marks, batch_id, batch_ids, batch_name, class: quizClass } = req.body;
 
     const quiz = await Quiz.findByPk(id);
     if (!quiz) {
@@ -392,6 +400,9 @@ const updateQuiz = async (req, res) => {
     const resolvedBatchId = batch_id !== undefined
       ? (batch_id && batch_id !== 'all' ? Number(batch_id) : null)
       : quiz.batch_id;
+    const resolvedBatchIds = batch_ids !== undefined
+      ? (Array.isArray(batch_ids) ? batch_ids.join(',') : (batch_ids ? String(batch_ids) : null))
+      : quiz.batch_ids;
     const resolvedBatchName = batch_name !== undefined
       ? (batch_name && batch_name !== 'all' ? batch_name : 'All Batches')
       : quiz.batch_name;
@@ -404,6 +415,7 @@ const updateQuiz = async (req, res) => {
       month: updatedMonth,
       total_marks: updatedMarks,
       batch_id: resolvedBatchId,
+      batch_ids: resolvedBatchIds,
       batch_name: resolvedBatchName,
       class: finalClass
     });

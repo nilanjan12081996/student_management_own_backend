@@ -19,6 +19,7 @@ module.exports = (sequelize, DataTypes) => {
     class: DataTypes.STRING,
     semester: DataTypes.STRING,
     batch_id: DataTypes.INTEGER,
+    batch_ids: DataTypes.STRING,
     batch_name: DataTypes.STRING,
     content_type: DataTypes.ENUM('text', 'pdf'),
     content_url: DataTypes.TEXT,
