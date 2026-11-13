@@ -63,7 +63,13 @@ function extractTextFromPdfBase64(base64Data) {
 // =====================================================================
 // 2. GOOGLE GEMINI MULTIMODAL API CALLER (REST)
 // =====================================================================
-const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+const GEMINI_MODELS = [
+  'gemini-3.8-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-3.5-flash',
+  'gemini-3.1-flash-lite',
+  'gemini-flash-latest'
+];
 
 async function callGeminiApi(prompt, fileBase64 = null, customKey = null, options = {}) {
   const apiKey = (customKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
@@ -124,8 +130,8 @@ async function callGeminiApi(prompt, fileBase64 = null, customKey = null, option
         } catch (_) {}
         lastError = `HTTP ${response.status}: ${parsedErr}`;
         console.warn(`Gemini (${model}) REST error:`, response.status, parsedErr);
-        // Stop retrying other models if key itself is invalid or permission denied
-        if (response.status === 400 || response.status === 401 || response.status === 403) {
+        // Only abort if key itself is unauthorized or forbidden
+        if (response.status === 401 || response.status === 403) {
           break;
         }
         continue;
@@ -500,12 +506,42 @@ Format schema:
               };
             });
 
-          if (validated.length > 0) {
+          // Strict Deduplication of Gemini's returned questions
+          const seenQ = new Set();
+          const uniqueGeminiQs = [];
+          for (const q of validated) {
+            const sig = q.question_text.toLowerCase().trim();
+            if (!seenQ.has(sig)) {
+              seenQ.add(sig);
+              uniqueGeminiQs.push(q);
+            }
+          }
+
+          // If Gemini generated fewer questions than requested, fill remaining slots uniquely
+          if (uniqueGeminiQs.length < parsedCount) {
+            const needed = parsedCount - uniqueGeminiQs.length;
+            const extra = generateSmartQuestions({
+              topic: topic || 'Computer Science',
+              referenceText: effectiveReferenceText,
+              count: needed,
+              difficulty,
+              cognitiveLayer: cognitive_layer
+            });
+            for (const eq of extra) {
+              const sig = eq.question_text.toLowerCase().trim();
+              if (!seenQ.has(sig) && uniqueGeminiQs.length < parsedCount) {
+                seenQ.add(sig);
+                uniqueGeminiQs.push(eq);
+              }
+            }
+          }
+
+          if (uniqueGeminiQs.length > 0) {
             return res.json({
               success: true,
-              questions: validated.slice(0, parsedCount),
-              count: Math.min(validated.length, parsedCount),
-              engine: `Google Gemini AI (${geminiResult.model || 'gemini-2.5-flash'})`,
+              questions: uniqueGeminiQs.slice(0, parsedCount),
+              count: uniqueGeminiQs.slice(0, parsedCount).length,
+              engine: `Google Gemini AI (${geminiResult.model || 'gemini-3.8-flash'})`,
               source: effectiveReferenceText || file_base64 ? `Gemini Multimodal (${file_name || 'Uploaded Reference'})` : 'Google Gemini AI'
             });
           }

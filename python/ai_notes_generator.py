@@ -616,10 +616,17 @@ CRITICAL GUIDELINES:
 
 Output clean, beautifully formatted Markdown text.
 """
-        response = client.models.generate_content(
-            model="gemini-1.5-flash",
-            contents=prompt
-        )
+        response = None
+        for model_name in ("gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.1-flash-lite"):
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt
+                )
+                if response and getattr(response, "text", None):
+                    break
+            except Exception:
+                continue
         text = response.text.strip() if response and response.text else ""
         if text:
             return {
